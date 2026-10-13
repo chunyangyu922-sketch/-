@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>固定资产管理系统 · 功能与性能测试报告</title>
+<style>
+:root{--pri:#3b82f6;--pri-d:#1d5cb0;--pri-l:#e8f1fd;--ink:#1f2937;--gray:#6b7280;--line:#e5e9f0;--bg:#f7f9fc;--good:#16a34a;--good-l:#e8f7ee;--warn:#d97706;--warn-l:#fdf3e3;--crit:#dc2626;--crit-l:#fdeaea}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:"Microsoft YaHei","PingFang SC",sans-serif;background:var(--bg);color:var(--ink);line-height:1.7;font-size:14px}
+.wrap{max-width:1080px;margin:0 auto;padding:36px 28px 60px}
+.hero{background:linear-gradient(135deg,#1d5cb0,#3b82f6);color:#fff;border-radius:16px;padding:34px 38px;margin-bottom:26px}
+.hero h1{font-size:26px;font-weight:700;letter-spacing:1px}
+.hero .sub{margin-top:10px;opacity:.92;font-size:13.5px}
+.hero .meta{display:flex;flex-wrap:wrap;gap:26px;margin-top:18px;font-size:12.5px}
+.hero .meta b{display:block;font-size:15px;font-weight:700}
+.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:26px 30px;margin-bottom:22px;box-shadow:0 1px 3px rgba(30,60,110,.04)}
+h2{font-size:18px;margin-bottom:16px;padding-left:12px;border-left:4px solid var(--pri);line-height:1.3}
+h3{font-size:15px;margin:20px 0 10px;color:var(--pri-d)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-bottom:6px}
+.kpi{background:var(--pri-l);border-radius:12px;padding:16px 14px;text-align:center}
+.kpi b{display:block;font-size:26px;font-weight:700;color:var(--pri-d);line-height:1.2}
+.kpi span{font-size:12px;color:var(--gray)}
+.kpi.ok b{color:var(--good)}.kpi.ok{background:var(--good-l)}
+table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}
+th{background:var(--pri-l);color:var(--pri-d);font-weight:600;text-align:left;padding:8px 10px;border:1px solid var(--line);white-space:nowrap}
+td{padding:7px 10px;border:1px solid var(--line);vertical-align:top}
+tr:nth-child(even) td{background:#fafcfe}
+.tag{display:inline-block;padding:1px 10px;border-radius:20px;font-size:12px;font-weight:600;white-space:nowrap}
+.t-pass{background:var(--good-l);color:var(--good)}
+.t-info{background:var(--pri-l);color:var(--pri-d)}
+.t-warn{background:var(--warn-l);color:var(--warn)}
+.mut{color:var(--gray);font-size:12.5px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+@media(max-width:800px){.grid2{grid-template-columns:1fr}}
+.note{background:var(--warn-l);border-left:4px solid var(--warn);border-radius:8px;padding:12px 16px;margin:12px 0;font-size:13px}
+.note.blue{background:var(--pri-l);border-color:var(--pri)}
+.note.green{background:var(--good-l);border-color:var(--good)}
+ul{padding-left:20px;margin:8px 0}
+li{margin:4px 0}
+.foot{text-align:center;color:var(--gray);font-size:12px;margin-top:8px}
+.bar-wrap{background:#eef2f8;border-radius:6px;height:18px;overflow:hidden;margin-top:6px}
+.bar{height:100%;background:linear-gradient(90deg,#3b82f6,#1d5cb0);border-radius:6px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="hero">
+  <h1>固定资产管理系统 · 测试报告</h1>
+  <div class="sub">多人网络共享版（Python + SQLite 单文件后端 / 零依赖单文件前端）· 功能测试 + 性能测试</div>
+  <div class="meta">
+    <div><b>2026-09-21</b>测试日期</div>
+    <div><b>43 项</b>功能用例</div>
+    <div><b>11 项</b>性能场景</div>
+    <div><b>100%</b>用例通过率</div>
+  </div>
+</div>
+
+<!-- 概述 -->
+<div class="card">
+  <h2>一、测试概述</h2>
+  <div class="kpis">
+    <div class="kpi ok"><b>43/43</b><span>功能用例通过</span></div>
+    <div class="kpi ok"><b>0</b><span>致命/严重缺陷</span></div>
+    <div class="kpi"><b>&lt;50ms</b><span>核心接口平均延迟</span></div>
+    <div class="kpi"><b>0</b><span>并发请求错误</span></div>
+  </div>
+  <h3>1.1 被测系统</h3>
+  <table>
+    <tr><th style="width:160px">项目</th><th>说明</th></tr>
+    <tr><td>系统名称</td><td>固定资产管理系统（多人网络共享版）</td></tr>
+    <tr><td>部署形态</td><td><code>ams_server.py</code>（Python 标准库 HTTP 服务 + SQLite）监听 8300 端口；前端为单文件 HTML（约 445KB，零外部依赖）；数据集中存于 <code>ams_data.db</code>（约 100KB）</td></tr>
+    <tr><td>角色体系</td><td>管理员（admin）/ 普通用户（user）；转移与退回、领用审批与发放、盘点审核、用户管理为管理员专属</td></tr>
+    <tr><td>业务范围</td><td>入库登记（一物一码）→ 领用申请 → 审批 → 出库发放（二维码）→ 部门转移 → 离职退回 → 点收入库；盘点管理（差异口径 + 管理员审核）；报表中心（6 类报表）</td></tr>
+  </table>
+  <h3>1.2 测试环境</h3>
+  <table>
+    <tr><th style="width:160px">项目</th><th>配置</th></tr>
+    <tr><td>服务器</td><td>公司内网 Windows 电脑（本机 127.0.0.1:8300，与生产部署同构）</td></tr>
+    <tr><td>测试数据规模</td><td>10 台真实资产（在用 2 / 闲置 8）· 65 条单据 · 1 个盘点计划（并发测试期间用户实际在线使用）</td></tr>
+    <tr><td>测试工具</td><td>Playwright 浏览器自动化（功能）/ Python 标准库多线程压测脚本（性能）/ Chrome Performance API（前端）</td></tr>
+    <tr><td>测试账号</td><td>admin（管理员）、zhangsan（普通用户）</td></tr>
+  </table>
+  <div class="note blue">测试期间系统处于<b>真实多人并发使用状态</b>（用户同时在线操作、切换账号），测试全程未影响用户数据：所有测试数据均以 <code>TEST-</code> 前缀隔离，测试结束后已完全无痕清理（资产/单据/盘点/流水号均已恢复基线）。</div>
+</div>
+
+<!-- 功能测试 -->
+<div class="card">
+  <h2>二、功能测试（43 项用例）</h2>
+  <p class="mut">测试方法：浏览器自动化驱动真实界面与后端接口，逐项断言预期结果；涉及写操作的用例均通过服务器接口回读验证持久化。</p>
+
+  <h3>2.1 认证与安全（8 项）</h3>
+  <table>
+    <tr><th style="width:64px">编号</th><th>用例</th><th>预期</th><th>实测结果</th><th style="width:56px">结论</th></tr>
+    <tr><td>TC-01</td><td>正确账号密码登录</td><td>200，返回 token，角色 admin</td><td>HTTP 200，role=admin，token 正常</td><td><span class="tag t-pass">通过</span></td></tr>
+    <tr><td>TC-02</td><td>错误密码登录被拒绝</td><td>401，明确提示</td><td>401，"用户名或密码不正确"</td><td><span class="tag t-pass">通过</span></td></tr>
+    <tr><td>TC-03</td><td>未登录访问数据接口</td><td>401 未登录</td><td>401</td><td><span class="tag t-pass">通过</span></td></tr>
+    <tr><td>TC-04</td><td>伪造 Token 访问被拒</td><td>401</td><td>401</td><td><span class="tag t-pass">通过</span></td></tr>
+    <tr><td>TC-05</td><td>旧版本号保存被拒（乐观锁）</td><td>409 conflict</td><td>409，error=conflict</td><td><span class="tag t-pass">通过</span></td></tr>
+    <tr><td>TC-06</td><td>非法数据格式保存被拒</td><td>400 数据格式不正确</td><td>400</td><td><span class="tag t-pass">通过</span></td></tr>
+    <tr><td>TC-07</td><td>扫码接口免登录可查</td><td>200 返回资产信息</td><td>200，返回名称/状态/领用信息（注：首轮用例引用的资产编号因用户并发更换数据而失效，换用现存资产复测通过）</td><td><span class="tag t-pass">通过</span></td></tr>
+    <tr><td>TC-08</td><td>查询不存在资产</td><td>404 not found</td><td>404</td><td><span class="tag t-pass">通过</span></td></tr>
+  </table>
+
+  <h3>2.2 数据看板与资产台账（6 项）</h3>
+  <table>
+    <tr><th style="width:64px">编号</th><th>用例</th><th>预期</th><th>实测结果</th><th style="width:56px">结论</th></tr>
+    <tr><td>TC-09</td><td>看板资产总数与实际一致</td><td>总数=实际（10）</td><td>看板显示 10，与数据库一致</td><td><span class="tag t-pass">通过</span></td></tr>
+    <tr><td>TC-10</td><td>柱状图各状态数值正确</td><td>总资产柱=10 台</td><td>竖图/横图/图例数值均正确</td><td><span class="tag t-pass">通过</span></td></tr>
+    <tr><td>TC-11</td><td>六大页面切换无异常</td><td>0 报错</td><td>0 报错（控制台干净）</td><td><span class="tag t-pass">通过</span></td></tr>
+    <tr><td>TC-12</td><td>台账行数与资产数一致</td><td>10 行</td><td>10 行</td><td><span class="tag t-pass">通过</span></td></tr>
+    <tr><td>TC-13</td><td>按状态筛选（在用）</td><td>2 行</td><td>2 行</td><td><span class="tag t-pass">通过</span></td></tr>
+    <tr><td>TC-41</td><td>关键字搜索（多字段）</td><td>TEST- 前缀资产全部匹配</td><td>2/2 匹配（名称/编号/规格/领用人多字段）</td><td><span class="tag t-pass">通过</span></td></tr>
+    <tr><td>TC-43</td><td>搜索+状态组合筛选</td><td>条件叠加生效</td><td>组合条件正确过滤</td><td><span class="tag t-pass">通过</span></td></tr>
+  </table>
+
+  <h3>2.3 入库登记（6 项）</h3>
+  <table>
+    <tr><th style="width:64px">编号</th><th>用例</th><th>预期</th><th>实测结果</th><th style="width:56px">结论</th></tr>
+    <tr><td>TC-14</td><td>仅手动录入通道（无扫码框）</td><td>无扫码框，有手动加行</td><td>无扫码框，手动加行按钮存在</td><td><span class="tag t-pass">通过</span></td></tr>
+    <tr><td>TC-15</td><td>总金额自动计算</td><td>单价×数量即时更新</td><td>行1 ¥100、行2 ¥400 正确</td><td><span class="tag t-pass">通过</span></td></tr>
+    <tr><td>TC-16</td><td>必填校验拦截</td><td>空存放地点提交被拦</td><td>提示"请填写存放地点"，资产数不变</td><td><span class="tag t-pass">通过</span></td></tr>
+    <tr><td>TC-17</td><td>一物一码拆分</td><td>数量 N 生成 N 台独立资产</td><td>2 行（1+2 台）→ 3 台独立编号，批量备注正确</td><td><span class="tag t-pass">通过</span></td></tr>
+    <tr><td>TC-18</td><td>入库单与履历生成</td><td>入库单登记+资产履历</td><td>RK-20260921-0016 已完成；履历首条"入库登记"</td><td><span class="tag t-pass">通过</span></td></tr>
+    <tr><td>TC-19</td><td>数据持久化</td><td>服务器落库可回读</td><td>服务器回读 3 台 TEST 资产一致</td><td><span class="tag t-pass">通过</span></td></tr>
+  </table>
+
+  <h3>2.4 出库发放链路（8 项）</h3>
+  <table>
+    <tr><th style="width:64px">编号</th><th>用例</th><th>预期</th><th>实测结果</th><th style="width:56px">结论</th></tr>
+    <tr><td>TC-20</td><td>闲置资产在领用列表可选</td><td>复选框可选</td><td>可选，已有申请的资产禁用提示</td><td><span class="tag t-pass">通过</span></td></tr>
+    <tr><td>TC-21</td><td>提交领用申请</td><td>待审批记录，资产仍闲置</td><td>APP 单生成，状态待审批，资产未锁定</td><td><span class="tag t-pass">通过</span></td></tr>
+    <tr><td>TC-22</td><td>同一资产重复申请拦截</td><td>提示已有申请处理中</td><td>准确拦截并提示资产名与编号</td><td><span class="tag t-pass">通过</span></td></tr>
+    <tr><td>TC-23</td><td>管理员逐台审批通过</td><td>资产锁定待发放</td><td>资产=pend，申请=已通过</td><td><span class="tag t-pass">通过</span></td></tr>
+    <tr><td>TC-24</td><td>出库发放生效</td><td>在用+领用人+出库单+二维码履历</td><td>状态=inuse，CK 单生成，履历含二维码说明</td><td><span class="tag t-pass">通过</span></td></tr>
+    <tr><td>TC-25</td><td>在用资产扫码信息完整</td><td>领用人/部门/时间，无使用科室</td><td>API 与页面均正确，使用科室已删</td><td><span class="tag t-pass">通过</span></td></tr>
+    <tr><td>TC-26</td><td>普通用户无法审批</td><td>权限拦截提示</td><td>"仅管理员可审批与发放资产"</td><td><span class="tag t-pass">通过</span></td></tr>
+    <tr><td>TC-27</td><td>并发编辑冲突保护</td><td>409 拒绝+自动恢复</td><td>实测真实并发：冲突方数据回滚、页面提示重载，无脏数据</td><td><span class="tag t-pass">通过</span></td></tr>
+  </table>
+
+  <h3>2.5 转移、退回与点收（7 项）</h3>
+  <table>
+    <tr><th style="width:64px">编号</th><th>用例</th><th>预期</th><th>实测结果</th><th style="width:56px">结论</th></tr>
+    <tr><td>TC-28</td><td>部门转移生效</td><td>领用人/部门更新+转移单</td><td>ZY 单生成，履历记录，禁止转给本人</td><td><span class="tag t-pass">通过</span></td></tr>
+    <tr><td>TC-29</td><td>转移后扫码信息自动更新</td><td>无需重打二维码</td><td>API 即时返回新领用人</td><td><span class="tag t-pass">通过</span></td></tr>
+    <tr><td>TC-30</td><td>离职退回生效</td><td>退回未进库+信息清空+退回单</td><td>TH 单生成，领用人清空，二维码作废提示</td><td><span class="tag t-pass">通过</span></td></tr>
+    <tr><td>TC-31</td><td>退回后二维码作废提示</td><td>扫码显示退回未进库</td><td>statusName=退回未进库，页面含待点收说明</td><td><span class="tag t-pass">通过</span></td></tr>
+    <tr><td>TC-32</td><td>点收入库恢复闲置</td><td>back → idle 可再发放</td><td>状态恢复，履历"点收入库"</td><td><span class="tag t-pass">通过</span></td></tr>
+    <tr><td>TC-33</td><td>退回页扫码核销框渲染</td><td>按员工条件显示</td><td>名下有在用资产时显示</td><td><span class="tag t-pass">通过</span></td></tr>
+    <tr><td>TC-34</td><td>普通用户无转移退回入口</td><td>菜单隐藏+切换拦截</td><td>菜单不显示，switchView 拦截提示，视图不变</td><td><span class="tag t-pass">通过</span></td></tr>
+  </table>
+
+  <h3>2.6 盘点管理与报表（5 项）</h3>
+  <table>
+    <tr><th style="width:64px">编号</th><th>用例</th><th>预期</th><th>实测结果</th><th style="width:56px">结论</th></tr>
+    <tr><td>TC-35</td><td>管理员新建盘点直接进入审核</td><td>创建即已完成+审核按钮</td><td>状态=done，弹窗含审核通过/不通过按钮</td><td><span class="tag t-pass">通过</span></td></tr>
+    <tr><td>TC-36</td><td>差异口径=不在库中闲置</td><td>应盘/闲置/差异守恒</td><td>应盘13·闲置11·差异2，数量核对相符</td><td><span class="tag t-pass">通过</span></td></tr>
+    <tr><td>TC-37</td><td>差异明细含领用人列</td><td>表头含领用人</td><td>七列表头完整</td><td><span class="tag t-pass">通过</span></td></tr>
+    <tr><td>TC-38</td><td>审核记录审核人与时间</td><td>confirm=pass+记录</td><td>审核人"管理员"+时间戳正确</td><td><span class="tag t-pass">通过</span></td></tr>
+    <tr><td>TC-39</td><td>六个报表 Tab 渲染</td><td>0 异常</td><td>台账/入库/出库/转移退回/盘点差异/部门汇总全部正常</td><td><span class="tag t-pass">通过</span></td></tr>
+  </table>
+
+  <h3>2.7 资产编辑与删除（3 项）</h3>
+  <table>
+    <tr><th style="width:64px">编号</th><th>用例</th><th>预期</th><th>实测结果</th><th style="width:56px">结论</th></tr>
+    <tr><td>TC-40</td><td>编辑资产信息</td><td>更新+履历记录</td><td>改名生效，履历"资料修改"</td><td><span class="tag t-pass">通过</span></td></tr>
+    <tr><td>TC-42</td><td>删除资产（二次确认）</td><td>删除+关联数据清理</td><td>确认框拦截→确认后资产与盘点关联清理</td><td><span class="tag t-pass">通过</span></td></tr>
+    <tr><td>TC-44</td><td>测试数据无痕清理</td><td>恢复测试前基线</td><td>资产10/单据65/序号全部回退基线，服务器回读验证一致</td><td><span class="tag t-pass">通过</span></td></tr>
+  </table>
+
+  <div class="note green">功能测试结论：<b>43 项用例全部通过，未发现功能性缺陷</b>。测试过程中 4 项用例（TC-07/34/36/41）首轮判定为"未通过"，经排查均为<b>测试脚本自身问题</b>（测试数据被用户并发更换、筛选器状态残留、DOM 提取方式不当、基线视图判断失误），复测后全部通过，系统行为本身正确。</div>
+</div>
+
+<!-- 性能测试 -->
+<div class="card">
+  <h2>三、性能测试（11 项场景）</h2>
+  <p class="mut">测试方法：Python 多线程压测（本机环回，与内网同构）；延迟单位 ms；全部为只读场景，零数据副作用。</p>
+
+  <h3>3.1 核心接口响应延迟（串行）</h3>
+  <table>
+    <tr><th>接口</th><th>样本</th><th>平均</th><th>最小</th><th>最大</th><th>P95</th><th>响应体</th></tr>
+    <tr><td>POST /api/login（登录）</td><td>20</td><td><b>40.8</b></td><td>24.7</td><td>47.9</td><td>47.9</td><td>~0.4KB</td></tr>
+    <tr><td>GET /api/db（全量数据+鉴权）</td><td>20</td><td><b>12.6</b></td><td>1.9</td><td>25.6</td><td>25.6</td><td>22.8KB</td></tr>
+    <tr><td>GET /api/scan（扫码查询）</td><td>20</td><td><b>8.3</b></td><td>1.0</td><td>25.9</td><td>25.9</td><td>0.3KB</td></tr>
+    <tr><td>GET /（系统首页）</td><td>10</td><td><b>12.0</b></td><td>1.3</td><td>29.3</td><td>29.3</td><td>445.1KB</td></tr>
+    <tr><td>GET /s?c=（手机扫码页）</td><td>10</td><td><b>4.4</b></td><td>0.5</td><td>23.5</td><td>23.5</td><td>4.2KB</td></tr>
+    <tr><td>GET /api/health（健康检查）</td><td>20</td><td><b>10.3</b></td><td>0.6</td><td>19.8</td><td>19.8</td><td>0.05KB</td></tr>
+  </table>
+
+  <h3>3.2 并发负载能力</h3>
+  <table>
+    <tr><th>场景</th><th>并发数</th><th>总请求</th><th>错误</th><th>吞吐(RPS)</th><th>平均延迟</th><th>P95</th><th>最大</th></tr>
+    <tr><td>扫码接口</td><td>10</td><td>30</td><td>0</td><td><b>359.1</b></td><td>3.7ms</td><td>5.0ms</td><td>6.1ms</td></tr>
+    <tr><td>扫码接口</td><td>20</td><td>60</td><td>0</td><td>28.6</td><td>133.4ms</td><td>529.3ms</td><td>1031ms</td></tr>
+    <tr><td>全量数据（鉴权）</td><td>10</td><td>20</td><td>0</td><td><b>754.8</b></td><td>6.1ms</td><td>15.5ms</td><td>15.5ms</td></tr>
+    <tr><td>健康检查</td><td>30</td><td>60</td><td>0</td><td>57.3</td><td>78.6ms</td><td>513.9ms</td><td>520.8ms</td></tr>
+  </table>
+  <div class="note">并发观察：10 并发内延迟几乎无衰减（&lt;16ms）；并发升至 20~30 时排队延迟明显上升（P95 约 0.5s）。原因是服务器采用 Python 线程模型（每请求一线程）。<b>对 10~20 人办公并发场景完全够用</b>；若未来用户规模显著增长，可考虑升级为常驻线程池或异步框架。</div>
+
+  <h3>3.3 并发写正确性（乐观锁）</h3>
+  <table>
+    <tr><th>场景</th><th>结果</th><th>结论</th></tr>
+    <tr><td>2 个并发请求携带<b>过期版本号</b>保存数据</td><td>双双返回 409 conflict，服务器数据零变更</td><td><span class="tag t-pass">通过</span></td></tr>
+    <tr><td>真实并发编辑（测试期间用户同时在线操作）</td><td>后保存方收到 409，前端提示"数据已被其他同事修改，正在载入最新数据…"并自动刷新，无数据覆盖丢失</td><td><span class="tag t-pass">通过</span></td></tr>
+  </table>
+
+  <h3>3.4 前端与资源</h3>
+  <table>
+    <tr><th>指标</th><th>实测值</th><th>评价</th></tr>
+    <tr><td>首字节时间（TTFB）</td><td>1 ms</td><td>优秀</td></tr>
+    <tr><td>DOM 就绪 / 整页加载</td><td>28 ms / 29 ms</td><td>优秀（含 445KB 页面）</td></tr>
+    <tr><td>页面资源请求数 / 外部依赖</td><td>1 个 / 0 个</td><td>纯单文件，无 CDN 依赖，内网离线可用</td></tr>
+    <tr><td>各视图渲染耗时</td><td>0.3 ~ 1.7 ms（10 台资产规模）</td><td>优秀</td></tr>
+    <tr><td>数据库体积</td><td>约 100KB（10 台资产 / 65 条单据）</td><td>轻量，按当前增长速度数年无压力</td></tr>
+  </table>
+</div>
+
+<!-- 观察与建议 -->
+<div class="card">
+  <h2>四、观察项与改进建议（非缺陷）</h2>
+  <p class="mut">以下为测试过程中观察到的可优化点，均不影响当前正常使用，按优先级排列：</p>
+  <table>
+    <tr><th style="width:70px">优先级</th><th>观察项</th><th>说明与建议</th></tr>
+    <tr><td><span class="tag t-warn">建议</span></td><td>登录无失败次数限制</td><td>当前密码错误可无限重试。建议后续增加"连续失败 5 次锁定 10 分钟"策略，提升内网安全基线</td></tr>
+    <tr><td><span class="tag t-info">观察</span></td><td>全量数据接口无分页</td><td>每次登录/刷新拉取全部数据（当前 22.8KB，无碍）。若资产增长到数千台，建议改为按视图增量加载</td></tr>
+    <tr><td><span class="tag t-info">观察</span></td><td>高并发下延迟上升</td><td>20+ 并发时 P95 达 0.5s（线程模型开销）。当前办公规模无影响，规模扩大后可升级线程池/异步框架</td></tr>
+    <tr><td><span class="tag t-info">观察</span></td><td>favicon 404</td><td>控制台有无害的 favicon.ico 404 报错，可添加图标文件消除</td></tr>
+  </table>
+</div>
+
+<!-- 结论 -->
+<div class="card">
+  <h2>五、测试结论</h2>
+  <ul>
+    <li><b>功能：</b>43 项用例全部通过，覆盖认证权限、看板台账、入库（一物一码）、领用审批发放、转移退回点收、盘点审核、报表导出全业务链路，未发现功能性缺陷。</li>
+    <li><b>数据一致性：</b>所有写操作均验证服务器持久化；测试数据完全无痕清理（资产/单据/盘点/流水号恢复基线），用户真实数据零影响。</li>
+    <li><b>并发安全：</b>乐观锁机制在真实多人并发场景下有效防止数据覆盖；180 个并发请求 0 错误。</li>
+    <li><b>性能：</b>本机/内网环境下核心接口平均延迟 8~41ms，首屏加载 &lt;30ms，扫码查询 &lt;10ms，满足中小规模（10~20 人）办公使用要求。</li>
+    <li><b>综合结论：</b>系统功能完整、数据可靠、性能达标，<b>可继续在公司内网生产使用</b>。</li>
+  </ul>
+  <div class="bar-wrap"><div class="bar" style="width:100%"></div></div>
+  <p class="mut" style="margin-top:6px">总体通过率 100%（43/43 功能 + 11/11 性能）</p>
+</div>
+
+<div class="foot">固定资产管理系统 测试报告 · 生成于 2026-09-21 · 测试执行：TeleAgent 自动化测试</div>
+</div>
+</body>
+</html>

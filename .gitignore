@@ -1,0 +1,19 @@
+# ===== 敏感数据：正式数据库与备份（严禁上传）=====
+ams_data.db
+backup/
+
+# ===== 环境 / 缓存 =====
+__pycache__/
+*.pyc
+.idea/
+.vscode/
+
+# ===== 安装包与临时文件 =====
+*.exe
+*.tmp
+*.log
+
+# ===== 系统文件 =====
+Thumbs.db
+Desktop.ini
+.DS_Store

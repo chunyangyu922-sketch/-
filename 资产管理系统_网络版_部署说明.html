@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>资产管理系统 · 网络版部署使用说明</title>
+<style>
+:root{--pri:#2a78d6;--pri-d:#1d5cb0;--pri-l:#eaf2fc;--ink:#1f2937;--gray:#6b7280;--line:#e5e7eb;--good:#0ca30c;--good-l:#e7f6ea;--warn:#a86a00;--warn-l:#fef6e3;--crit:#d03b3b;--crit-l:#fdeeee}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:"Segoe UI","Microsoft YaHei",system-ui,sans-serif;background:#f4f5f7;color:var(--ink);font-size:14px;line-height:1.75}
+.wrap{max-width:860px;margin:0 auto;padding:32px 20px 64px}
+.hero{background:linear-gradient(135deg,#101b33,#1d3a66);color:#fff;border-radius:14px;padding:30px 32px;margin-bottom:22px}
+.hero h1{font-size:22px;margin-bottom:6px}
+.hero p{color:#c9d4e8;font-size:13.5px}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:22px 24px;margin-bottom:16px;box-shadow:0 1px 2px rgba(16,24,40,.05)}
+h2{font-size:16px;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+h2 .no{width:24px;height:24px;border-radius:7px;background:var(--pri);color:#fff;font-size:13px;display:inline-flex;align-items:center;justify-content:center;flex:none}
+h3{font-size:14px;margin:14px 0 6px}
+p{margin:6px 0}
+ol,ul{padding-left:22px;margin:8px 0}
+li{margin:5px 0}
+code{background:#eef2f7;border:1px solid var(--line);border-radius:5px;padding:1px 7px;font-family:Consolas,monospace;font-size:13px;color:var(--pri-d)}
+pre{background:#0f172a;color:#e2e8f0;border-radius:10px;padding:14px 16px;overflow-x:auto;font-family:Consolas,monospace;font-size:13px;line-height:1.7;margin:10px 0}
+table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}
+th{background:#f8fafc;text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);font-size:12px;color:var(--gray)}
+td{padding:9px 12px;border-bottom:1px solid #f1f3f5;vertical-align:top}
+.tip{background:var(--good-l);border-left:3px solid var(--good);border-radius:0 8px 8px 0;padding:10px 14px;margin:10px 0;font-size:13px}
+.warn{background:var(--warn-l);border-left:3px solid #fab219;border-radius:0 8px 8px 0;padding:10px 14px;margin:10px 0;font-size:13px}
+.danger{background:var(--crit-l);border-left:3px solid var(--crit);border-radius:0 8px 8px 0;padding:10px 14px;margin:10px 0;font-size:13px}
+.kv{display:flex;gap:10px;flex-wrap:wrap;margin:8px 0}
+.kv b{flex:none;color:var(--gray);font-weight:600}
+.tag{display:inline-block;font-size:12px;font-weight:600;border-radius:99px;padding:2px 10px;background:var(--pri-l);color:var(--pri-d)}
+.step{display:flex;gap:12px;margin:12px 0;align-items:flex-start}
+.step .n{width:26px;height:26px;border-radius:50%;background:var(--pri-l);color:var(--pri-d);font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center;flex:none;margin-top:2px}
+.step .b{flex:1}
+.step .b b.t{display:block;margin-bottom:2px}
+.mut{color:var(--gray);font-size:12.5px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="hero">
+  <h1>固定资产管理系统 · 网络版　部署使用说明</h1>
+  <p>数据集中存储 · 全公司同一本账 · 账号登录与角色权限 · 单文件服务器，零第三方依赖</p>
+</div>
+
+<div class="card">
+  <h2><span class="no">1</span>这套系统里有什么</h2>
+  <table>
+    <tr><th>文件</th><th>作用</th><th>放在哪里</th></tr>
+    <tr><td><code>ams_server.py</code></td><td>服务器程序（Python 单文件，只用到系统自带功能，无需安装任何库）</td><td>服务器/主机电脑</td></tr>
+    <tr><td><code>python-3.12.10-amd64.exe</code></td><td>Python 官方安装包（Python Software Foundation 数字签名已验证）</td><td>与服务器同目录</td></tr>
+    <tr><td><code>一键安装Python.bat</code></td><td>双击自动安装 Python 并配置环境变量；已装过则自动跳过</td><td>与服务器同目录</td></tr>
+    <tr><td><code>资产管理系统_网络版.html</code></td><td>系统页面（已内嵌二维码图片识别组件，离线可用，无需联网下载）</td><td>与服务器同目录</td></tr>
+    <tr><td><code>ams_data.db</code></td><td>数据库文件（首次启动自动创建，全部业务数据都在这一个文件里）</td><td>自动生成，与服务器同目录</td></tr>
+    <tr><td><code>重置管理员密码.py</code></td><td>忘记管理员密码时的应急重置工具</td><td>与服务器同目录（用不到可不管）</td></tr>
+    <tr><td><code>资产管理系统.html</code></td><td>原来的单机版（不需要网络共享时继续用它，两版数据相互独立）</td><td>保持原位</td></tr>
+  </table>
+</div>
+
+<div class="card">
+  <h2><span class="no">2</span>五分钟部署（在一台常开的电脑上）</h2>
+  <div class="step"><div class="n">1</div><div class="b"><b class="t">拷贝整个文件夹</b><span class="mut">把「资产管理系统_网络版」整个文件夹拷到主机电脑（例如 <code>D:\资产系统</code>）。文件夹内已自带 Python 官方安装包，无需提前准备任何环境。</span></div></div>
+  <div class="step"><div class="n">2</div><div class="b"><b class="t">安装 Python（双击即可）</b><span class="mut">双击「<b>一键安装Python.bat</b>」：自动安装官方 Python 3.12.10 并配置好环境变量（仅当前用户，无需管理员权限，无需联网）。若本机已装过 Python 会自动跳过。也可手动双击 <code>python-3.12.10-amd64.exe</code> 安装（务必勾选 Add python.exe to PATH）。</span></div></div>
+  <div class="step"><div class="n">3</div><div class="b"><b class="t">启动服务器</b><span class="mut">双击「<b>启动资产系统服务器.bat</b>」；或在文件夹里打开命令行（地址栏输入 cmd 回车）执行：</span>
+    <pre>python ams_server.py</pre>
+    <span class="mut">启动成功会显示访问地址，并自动打开浏览器。首次启动自动创建数据库和管理员账号。</span></div></div>
+  <div class="step"><div class="n">4</div><div class="b"><b class="t">登录并修改密码</b><span class="mut">默认账号 <code>admin / admin123</code>。登录后进入"系统设置 → 当前账号"点击"修改密码"。</span></div></div>
+  <div class="step"><div class="n">5</div><div class="b"><b class="t">创建同事账号并分发给全公司</b><span class="mut">"系统设置 → 用户管理"中新增账号（建议每类岗位建 1-2 个），然后把访问地址告诉同事：同事在任何电脑浏览器打开 <code>http://主机IP:8300</code> 即可使用。</span></div></div>
+  <div class="tip">主机电脑的局域网 IP 启动时会自动显示（形如 <code>http://192.168.x.x:8300</code>）。建议在路由器/网管处为这台电脑设置固定 IP，地址就不会变。</div>
+</div>
+
+<div class="card">
+  <h2><span class="no">3</span>账号与角色权限</h2>
+  <table>
+    <tr><th>角色</th><th>能做什么</th><th>适合谁</th></tr>
+    <tr><td><span class="tag">管理员</span></td><td>全部业务操作，含 <b>领用审批（通过 / 驳回）、转移申请审核、出库发放</b>、<b>离职退回与点收入库（管理员专有）</b>、用户管理、载入演示数据 / 清空数据 / 导入备份</td><td>资产管理负责人（1-2 人）</td></tr>
+    <tr><td><span class="tag">用户</span></td><td>入库登记、领用申请、<b>提交转移申请（待管理员审核）</b>、盘点、编辑台账、部门与分类维护、导出备份；<b>不能审批、驳回与发放资产，不能办理离职退回</b>（相关按钮不可见，接口层也拦截）</td><td>日常操作系统的同事</td></tr>
+  </table>
+  <p class="mut">旧版的"系统管理员 / 资产管理员 / 只读账号"升级后自动归入对应新角色：系统管理员→管理员，资产管理员与只读账号→用户。所有操作记录中的"经办人"自动取当前登录人姓名；退出登录请点右上角"退出"。</p>
+</div>
+
+<div class="card">
+  <h2><span class="no">3+</span>扫码与二维码说明（本轮新增）</h2>
+  <ul>
+    <li><b>领用人限定注册用户</b>：领用申请的领用人改为下拉选择，只能从系统注册用户中选取（账号在"用户管理"中创建）；流程调整为<b>先勾选闲置资产、再填写领用信息</b>——未勾选资产时领用信息表单置灰不可填，勾选后自动解锁。勾选支持点击复选框或整行任意位置，实时高亮并统计已选台数。</li>
+    <li><b>图片识别二维码</b>：入库登记、离职退回、盘点管理三处扫码框旁新增「图片识别」按钮——拍好照片 / 保存的二维码图片，点击按钮选图即可自动识别，识别结果自动提取资产编号并回填，扫码枪不在手边时同样能完成扫码。</li>
+    <li><b>出库码＝通用信息码（不限网络）</b>：码内为单行精简文本（名称 / 编号 / 状态 / 领用人 / 领用部门 / 领取时间 / 存放），<b>无需联网、不限网络</b>，微信 / 任意 App / 手机相机扫码均可显示。<b>下载的 PNG 标签同时印有完整信息文字</b>（资产名、编号、状态、领用人、领取时间、存放地点），不看手机也能直接核验。转移 / 退回后信息变更，系统会提示重新打印。</li>
+    <li><b>在线码＝动态链接码（需内网）</b>：扫码打开信息页，信息随转移 / 退回自动更新、无需重打；由服务器自动嵌入内网地址，需与服务器同内网使用。两种码按需选用，信息码适合张贴，在线码适合内网动态查询。</li>
+    <li><b>动态信息，无需重打</b>：部门转移、离职退回后，同一张二维码扫出来的信息自动更新（旧值留档在系统内），不用重新打印张贴。</li>
+    <li class="mut">注意：出库码（信息码）不限网络；在线码要求手机与服务器在同一内网。资产码（AMS|编号）与产品码保持原样，供扫码枪使用，图片识别同样兼容（扫描信息码 / 在线码 / 资产码均可自动提取编号）。</li>
+  </ul>
+</div>
+
+<div class="card">
+  <h2><span class="no">4</span>数据安全与备份</h2>
+  <ul>
+    <li><b>数据只存在主机电脑的一个文件里</b>：<code>ams_data.db</code>。备份 = 复制这个文件（建议每周一次，复制到共享盘或网盘）。</li>
+    <li>备份前最好先停止服务器（命令行窗口按 <code>Ctrl+C</code>），复制完再启动；或至少避开正有人保存数据的时间点。</li>
+    <li>页面内的"导出备份（JSON）"仍然可用，适合单次留档或迁移；恢复用"导入备份"。</li>
+    <li><b>防互相覆盖机制</b>：两人同时保存时，后保存的人会收到"数据已被其他同事修改"提示并自动刷新为最新数据。日常多人错峰操作基本不会遇到。</li>
+  </ul>
+  <div class="warn">清除主机电脑浏览器缓存不影响数据（数据不在浏览器里）；但<b>删除 ams_data.db 文件 = 删除全部业务数据</b>，请谨慎。</div>
+</div>
+
+<div class="card">
+  <h2><span class="no">5</span>常见问题</h2>
+  <h3>同事打不开 <code>http://主机IP:8300</code>？</h3>
+  <ul>
+    <li>确认主机电脑开着、服务器命令行窗口没关；</li>
+    <li>首次启动 Windows 防火墙可能弹窗，请选择"允许访问"；若已错过，可在"Windows 安全中心 → 防火墙 → 允许应用通过防火墙"里勾选 Python；</li>
+    <li>确认同事电脑与主机在同一内网（同一办公网段）。</li>
+  </ul>
+  <h3>提示"端口 8300 已被占用"？</h3>
+  <p>用记事本打开 <code>ams_server.py</code>，把顶部 <code>PORT = 8300</code> 改成其他数字（如 <code>8301</code>）保存后重启。</p>
+  <h3>忘记 admin 密码？</h3>
+  <p>在服务器目录执行：<code>python 重置管理员密码.py</code>，密码会重置为 <code>admin123</code>，登录后再修改。</p>
+  <h3>想开机自动启动服务器？</h3>
+  <p>按 <code>Win+R</code> 输入 <code>shell:startup</code> 回车，把"启动服务器"用的快捷方式放进去；或交给公司 IT 做成 Windows 服务。</p>
+  <h3>数据和单机版互通吗？</h3>
+  <p>不互通，两版是独立存储。如需把单机版现有数据迁到网络版：在单机版"导出备份（JSON）"→ 网络版 admin 登录后"导入备份"即可，资产、单据、盘点、部门分类全部带过去。</p>
+</div>
+
+<div class="card">
+  <h2><span class="no">6</span>功能一览（与单机版一致）</h2>
+  <div class="kv">
+    <b>数据看板：</b><span>资产总数 / 在用占比 / 待办提醒 / 科室分布 / 盘点完成率 / 最近动态</span>
+  </div>
+  <div class="kv"><b>资产业务：</b><span>入库登记（入库部门必填）→ 领用申请 → 管理员审批 → 出库发放（出库二维码）；部门转移：用户提交申请 → 管理员审核生效（码随人走、旧值留档）；离职退回与点收入库：管理员专有（扫码核销、人走账清）</span></div>
+  <div class="kv"><b>盘点：</b><span>创建盘点计划 → 扫码枪 / 手输编号逐台登记 → 差异清单 → 导出差异</span></div>
+  <div class="kv"><b>二维码中心：</b><span>出库码（微信扫码可看的链接码，含领用人 / 领用部门 / 领取时间）/ 资产码 / 产品码三视图，下载 PNG 打印张贴</span></div>
+  <div class="kv"><b>报表中心：</b><span>台账、入库明细、出库发放、转移与退回、盘点差异、部门汇总六类报表，支持导出 CSV 与打印</span></div>
+</div>
+
+<p class="mut" style="text-align:center;margin-top:18px">固定资产管理系统 · 网络版　—　本页为部署说明，可打印留存</p>
+</div>
+</body>
+</html>
