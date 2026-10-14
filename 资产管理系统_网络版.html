@@ -51,6 +51,28 @@ input,select,textarea{font-family:inherit;font-size:14px;color:var(--ink)}
 .top-right select{padding:6px 10px;border:1px solid var(--line);border-radius:9px;background:#fff;font-size:13px}
 .content{padding:26px 30px;max-width:none}
 
+/* ===== 多标签页（浏览器式）===== */
+.tabbar{display:flex;align-items:flex-end;gap:5px;padding:10px 22px 0;background:#fff;border-bottom:1px solid var(--line);overflow-x:auto;scrollbar-width:none}
+.tabbar::-webkit-scrollbar{display:none}
+.tab{display:inline-flex;align-items:center;gap:7px;padding:7px 8px 7px 12px;border:1px solid transparent;border-bottom:none;border-radius:10px 10px 0 0;font-size:12.5px;color:var(--ink2);cursor:pointer;white-space:nowrap;flex:none;user-select:none;position:relative;margin-bottom:-1px;transition:background .15s,color .15s}
+.tab:hover{background:#f2f7fd;color:var(--ink)}
+.tab.on{background:var(--pri-l);color:var(--pri-d);font-weight:600;border-color:#d7e6f8}
+.tab.on::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;background:var(--pri);border-radius:2px 2px 0 0}
+.tab .tic{font-size:14px;line-height:1;flex:none}
+.tab .tt{max-width:110px;overflow:hidden;text-overflow:ellipsis}
+.tab .tx{width:17px;height:17px;border-radius:5px;display:inline-flex;align-items:center;justify-content:center;font-size:13px;line-height:1;color:var(--gray);opacity:0;transition:opacity .12s;flex:none}
+.tab:hover .tx,.tab.on .tx{opacity:1}
+.tab .tx:hover{background:rgba(42,120,214,.16);color:var(--pri-d)}
+.tab .tdot{width:6px;height:6px;border-radius:50%;background:var(--warn);box-shadow:0 0 0 3px var(--warn-l);flex:none}
+.tab.new{padding:7px 13px;font-size:15px;color:var(--gray);border:1px dashed var(--line-2);border-bottom:none;border-radius:10px 10px 0 0;background:#fbfcfe;line-height:1}
+.tab.new:hover{color:var(--pri);border-color:var(--pri)}
+.tabmenu{position:fixed;z-index:60;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 36px -12px rgba(16,24,40,.22);padding:6px;min-width:216px;max-height:60vh;overflow:auto}
+.tabmenu .tm-h{font-size:11.5px;color:var(--gray);padding:6px 10px 4px;letter-spacing:.06em}
+.tabmenu .tm-item{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:8px;font-size:13px;cursor:pointer;color:var(--ink)}
+.tabmenu .tm-item:hover{background:var(--pri-l)}
+.tabmenu .tm-item .ic{width:18px;text-align:center;flex:none}
+.tabmenu .tm-item.opened .tm-open{margin-left:auto;font-size:11px;color:var(--gray);background:var(--gray-l);border-radius:99px;padding:1px 8px;flex:none}
+
 /* ===== 卡片 ===== */
 .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:22px;box-shadow:0 1px 2px rgba(16,24,40,.04),0 6px 20px -12px rgba(16,24,40,.12)}
 .card + .card{margin-top:16px}
@@ -229,7 +251,7 @@ table.tbl{width:100%;border-collapse:collapse;font-size:13px;min-width:640px}
 
 /* ===== 打印 ===== */
 @media print{
-  .sidebar,.topbar,.no-print,.mask,.toast{display:none !important}
+  .sidebar,.topbar,.tabbar,.tabmenu,.no-print,.mask,.toast{display:none !important}
   .main{margin:0;padding:0}
   .content{padding:0;max-width:none}
   .card{border:none;box-shadow:none;padding:0}
@@ -244,6 +266,8 @@ table.tbl{width:100%;border-collapse:collapse;font-size:13px;min-width:640px}
 @media (max-width:760px){
   .sidebar{display:none}
   .main{margin-left:0}
+  .tabbar{padding:8px 12px 0}
+  .tab .tt{max-width:72px}
   .form-grid,.g2{grid-template-columns:1fr}
   .tiles,.g3,.g4{grid-template-columns:1fr}
   .content{padding:16px}
@@ -272,6 +296,7 @@ table.tbl{width:100%;border-collapse:collapse;font-size:13px;min-width:640px}
         <button class="btn ghost sm" onclick="logout()">退出</button>
       </div>
     </header>
+    <div class="tabbar" id="tabbar"></div>
     <div class="content">
       <section class="view on" id="view-dash"></section>
       <section class="view" id="view-ledger"></section>
@@ -12775,7 +12800,7 @@ function save(){
   if(!ME)return;
   if(CUR_ORG==='ALL'){toast('「全部机构」为只读汇总视图，请先切换到具体机构再保存','err');return}
   apiFetch('/api/db',{version:DBV,data:DB,org:CUR_ORG}).then(({ok,status,j})=>{
-    if(ok){DBV=j.version;return}
+    if(ok){DBV=j.version;markTabsDirty();return} /* 其他已开标签标脏，切回时自动刷新 */
     if(status===409){toast('数据已被其他同事修改，正在载入最新数据…','err');setTimeout(()=>location.reload(),1200)}
     else if(status===401){toast('登录已过期，请重新登录','err');setTimeout(()=>location.reload(),1200)}
     else toast('保存失败：'+(j.error||('HTTP '+status)),'err');
@@ -12871,18 +12896,41 @@ const NAV=[
 ];
 const renderers={dash:renderDash,ledger:renderLedger,inbound:renderInbound,outbound:renderOutbound,transfer:renderTransfer,stock:renderStock,report:renderReport,settings:renderSettings};
 let CUR='dashboard';
+/* ===== 多标签页（浏览器式）：每个页面一个标签，可同时打开多个页面操作 =====
+   切换标签不重渲染 —— 已填写的表单、筛选条件、勾选与滚动位置原样保留；
+   数据保存后其他标签自动标脏（●），切回时才刷新，兼顾状态保留与数据新鲜。 */
+let TABS=[]; /* 已打开标签：{k:视图key, dirty:后台数据已变更} */
 function pendingCount(){return DB.records.filter(r=>(r.type==='领用申请'||r.type==='转移申请')&&(r.status==='待审批'||r.status==='部分处理')).length}
+function tabByK(k){return TABS.find(t=>t.k===k)}
 function renderNav(){
   const pending=pendingCount();
   let lastG='';
   const items=NAV.filter(n=>!(n.admin&&ME&&ME.role!=='admin')).map(n=>{
     let g='';
     if(n.g&&n.g!==lastG){g=`<div class="group">${n.g}</div>`;lastG=n.g}
-    return g+`<a data-v="${n.k}" class="${CUR===n.k?'on':''}" onclick="switchView('${n.k}')"><span class="ic">${n.ic}</span>${n.t}${(n.k==='outbound'&&pending)?`<span class="tip">${pending}</span>`:''}</a>`;
+    return g+`<a data-v="${n.k}" class="${CUR===n.k?'on':''}" onclick="openTab('${n.k}')"><span class="ic">${n.ic}</span>${n.t}${(n.k==='outbound'&&pending)?`<span class="tip">${pending}</span>`:''}</a>`;
   }).join('');
   $('#snav').innerHTML=items;
 }
-function switchView(k){
+function renderTabBar(){
+  const bar=$('#tabbar');if(!bar)return;
+  bar.innerHTML=TABS.map(t=>{
+    const m=NAV.find(n=>n.k===t.k);if(!m)return '';
+    return `<div class="tab ${CUR===t.k?'on':''}" onclick="focusTab('${t.k}')" title="${esc(m.t)}：${esc(m.sub)}">
+      <span class="tic">${m.ic}</span><span class="tt">${esc(m.t)}</span>${t.dirty?'<span class="tdot" title="数据已更新，切到此页时自动刷新"></span>':''}
+      <span class="tx" onclick="event.stopPropagation();closeTab('${t.k}')" title="关闭">×</span></div>`;
+  }).join('')+`<div class="tab new" onclick="tabNewMenu(event)" title="打开新页面（可同时开多个页面操作）">＋</div>`;
+}
+/* 打开或聚焦标签；re=true 跳转后立即重渲染（操作完成后的跳转刷新） */
+function openTab(k,re){
+  const nk=NAV.find(n=>n.k===k);
+  if(nk&&nk.admin&&ME&&ME.role!=='admin'){toast('「'+nk.t+'」仅管理员可用','err');return}
+  const isNew=!tabByK(k);
+  if(isNew)TABS.push({k,dirty:false});
+  focusTab(k,re||isNew); /* 新开的标签必须渲染一次；已开的仅聚焦（保留表单/筛选状态） */
+}
+function focusTab(k,re){
+  const t=tabByK(k);if(!t)return;
   const nk=NAV.find(n=>n.k===k);
   if(nk&&nk.admin&&ME&&ME.role!=='admin'){toast('「'+nk.t+'」仅管理员可用','err');return}
   CUR=k;
@@ -12891,8 +12939,39 @@ function switchView(k){
   const m=NAV.find(n=>n.k===k);
   $('#pageTitle').textContent=m.t;
   $('#pageSub').textContent=m.sub;
-  (renderers[k]||renderDash)();
+  if(re||t.dirty){(renderers[k]||renderDash)();t.dirty=false} /* 仅显式刷新或后台数据已变时重渲染 */
+  renderTabBar();
 }
+function closeTab(k){
+  const i=TABS.findIndex(t=>t.k===k);
+  if(i<0)return;
+  TABS.splice(i,1);
+  if(!TABS.length){openTab('dash',true);return} /* 浏览器至少保留一个页面 */
+  if(CUR===k)focusTab(TABS[Math.min(i,TABS.length-1)].k); /* 聚焦相邻标签（若标脏自动刷新） */
+  else renderTabBar();
+}
+/* 数据保存成功后：其他已开标签标脏，切换过去时自动刷新（当前页由调用方即时重渲染） */
+function markTabsDirty(){TABS.forEach(t=>{if(t.k!==CUR)t.dirty=true});renderTabBar()}
+/* 数据整体换新（切机构 / 载入演示 / 导入备份 / 重新登录）：全部标签标脏 */
+function dbReloaded(){TABS.forEach(t=>t.dirty=true)}
+function tabCloseMenu(){const m=document.getElementById('tabmenu');if(m)m.remove()}
+function tabNewMenu(ev){
+  ev.stopPropagation();
+  const old=document.getElementById('tabmenu');
+  if(old){old.remove();return} /* 再点一次收起 */
+  const items=NAV.filter(n=>!(n.admin&&ME&&ME.role!=='admin')).map(n=>{
+    const opened=!!tabByK(n.k);
+    return `<div class="tm-item ${opened?'opened':''}" onclick="tabCloseMenu();openTab('${n.k}')"><span class="ic">${n.ic}</span>${n.t}${opened?'<span class="tm-open">已打开</span>':''}</div>`;
+  }).join('');
+  const d=document.createElement('div');d.id='tabmenu';d.className='tabmenu';
+  d.innerHTML='<div class="tm-h">打开页面</div>'+items;
+  document.body.appendChild(d);
+  const r=ev.currentTarget.getBoundingClientRect();
+  d.style.left=Math.min(r.left,window.innerWidth-d.offsetWidth-12)+'px';
+  d.style.top=(r.bottom+8)+'px';
+}
+document.addEventListener('click',e=>{if(document.getElementById('tabmenu')&&!e.target.closest('#tabmenu')&&!e.target.closest('.tab.new'))tabCloseMenu()});
+function switchView(k){openTab(k,true)} /* 兼容既有调用：跳转并刷新目标页 */
 /* ================= 选择框选项 ================= */
 function deptOpts(sel){return DB.depts.map(d=>`<option ${d===sel?'selected':''}>${esc(d)}</option>`).join('')}
 function locOpts(sel){
@@ -15901,11 +15980,11 @@ function importBackup(input){
   if(CUR_ORG==='ALL')return toast('「全部机构」为只读汇总视图，请先切换到具体机构再导入备份','err');
   const f=input.files&&input.files[0];if(!f)return;
   const rd=new FileReader();
-  rd.onload=()=>{try{const j=JSON.parse(rd.result);if(!j||!j.assets||!j.depts)throw new Error('格式不正确');DB=j;ensureLocs();save();toast('备份已导入');switchView('dash')}catch(e){toast('导入失败：'+e.message,'err')}};
+  rd.onload=()=>{try{const j=JSON.parse(rd.result);if(!j||!j.assets||!j.depts)throw new Error('格式不正确');DB=j;ensureLocs();save();toast('备份已导入');dbReloaded();switchView('dash')}catch(e){toast('导入失败：'+e.message,'err')}};
   rd.readAsText(f);
   input.value='';
 }
-function loadDemo(){if(!adminOnly())return;if(CUR_ORG==='ALL')return toast('请先切换到具体机构再载入演示数据','err');confirmDlg(`载入演示数据将<strong>覆盖</strong>当前机构「${esc(orgName(CUR_ORG))}」的全部数据，是否继续？`,()=>{seedDB();ensureLocs();toast('已载入演示数据');switchView('dash')},'载入',true)}
+function loadDemo(){if(!adminOnly())return;if(CUR_ORG==='ALL')return toast('请先切换到具体机构再载入演示数据','err');confirmDlg(`载入演示数据将<strong>覆盖</strong>当前机构「${esc(orgName(CUR_ORG))}」的全部数据，是否继续？`,()=>{seedDB();ensureLocs();toast('已载入演示数据');dbReloaded();switchView('dash')},'载入',true)}
 /* 清空系统全部数据：所有机构的资产/单据/盘点数据 + 所有机构 + 除内置管理员外的全部用户；服务器自动备份后重建空白机构 */
 async function wipeData(){
   if(!adminOnly())return;
@@ -15928,7 +16007,7 @@ async function enterApp(){
   DB.role=ME.displayName||ME.username;
   $('#appRoot').style.visibility='';
   $('#loginMask').style.display='none';
-  renderNav();switchView('dash');updateUserBar();
+  renderNav();dbReloaded();switchView('dash');updateUserBar();
 }
 function showLogin(){
   $('#appRoot').style.visibility='hidden';
@@ -15972,6 +16051,7 @@ async function switchOrg(org){
   USER_DIR=[]; // 选人名单随查看范围变化，重新加载
   loadUserDir();
   renderNav();
+  dbReloaded(); // 机构数据已切换：所有已开标签标脏，切回时刷新
   const cur=CUR;switchView(cur);
   updateUserBar();
   toast(CUR_ORG==='ALL'?'已切换：全部机构（总览 · 只读）':'已切换机构：'+(j.orgName||orgName(CUR_ORG)));
