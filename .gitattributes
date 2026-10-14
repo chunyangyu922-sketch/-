@@ -1,0 +1,2 @@
+# 批处理文件强制以 CRLF 检出（cmd 的 goto/标签解析依赖 CRLF 行界）
+*.bat text eol=crlf
