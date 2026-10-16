@@ -15376,6 +15376,16 @@ function faRows(){
   });
   return rows;
 }
+/* ================= 库存表（格式按用户《库存表.xlsx》实测复刻：B~M 12 列 + 空 A 列；表头筛选箭头覆盖到「状态/领用人」） ================= */
+const WH_HDRS=['','资产编码','资产名称','资产类别','入账日期','单位','数量','规格','SN码','入库部门','存放位置','状态','领用人'];
+const WH_WIDTHS=[8.75,18.4,17.125,17.125,11.75,8.75,5.8,17.25,25.8,12.9,11.1,18.6,9]; /* 库存表.xlsx 实测列宽（A~L 显式设置，M 为默认宽 9） */
+const WH_ROW_HT=15.6; /* 库存表.xlsx sheetFormatPr 实测默认行高 */
+const WH_DATE_COLS=[4]; /* 入账日期：导出为真日期单元格（yyyy/m/d），与库存表一致 */
+/* 库存表行：状态口径与库存表一致（有领用人=已领用 / 无=未领用），按资产编码顺序排列 */
+function whRows(){
+  return DB.assets.slice().sort((a,b)=>String(a.code||'').localeCompare(String(b.code||''),'zh'))
+    .map(x=>['',x.code||'',x.name||'',x.cat||'',x.inDate||'',x.unit||'',x.qty||1,x.spec||'',x.productCode||'',x.inDept||'',x.location||'',(x.user?'已领用':'未领用'),x.user||'']);
+}
 /* 台账排序：同部门的人放在一起（部门顺序跟随系统设置，未收录的部门名排其后），同部门内按领用人归拢、同人按编号；未领用的统一排在最后 */
 function ledgerDeptUserCmp(a,b){
   const da=assetOwnerDept(a),db=assetOwnerDept(b);
@@ -15391,7 +15401,7 @@ function ledgerDeptUserCmp(a,b){
 }
 let REP_TAB='台账';
 function renderReport(){
-  const tabs=[['台账','台账'],['入库','入库明细'],['出库','出库发放'],['转移退回','转移与退回'],['盘点差异','盘点差异'],['资产卡片','资产卡片'],['部门汇总','部门汇总'],['Excel回填','Excel回填']].map(([k,t])=>`<button class="${REP_TAB===k?'on':''}" onclick="REP_TAB='${k}';renderReport()">${t}</button>`).join('');
+  const tabs=[['台账','台账'],['入库','入库明细'],['出库','出库发放'],['转移退回','转移与退回'],['盘点差异','盘点差异'],['资产卡片','资产卡片'],['库存表','库存表'],['部门汇总','部门汇总'],['Excel回填','Excel回填']].map(([k,t])=>`<button class="${REP_TAB===k?'on':''}" onclick="REP_TAB='${k}';renderReport()">${t}</button>`).join('');
   $('#view-report').innerHTML=`<div class="card">
     <div class="filterbar">
       <div class="qrtabs">${tabs}</div>
@@ -15429,6 +15439,9 @@ function reportData(){
   }else if(REP_TAB==='资产卡片'){
     d.h=FA_HDRS.slice();
     d.r=faRows();
+  }else if(REP_TAB==='库存表'){
+    d.h=WH_HDRS.slice();
+    d.r=whRows();
   }else if(REP_TAB==='部门汇总'){
     d.h=['部门','资产数量','金额合计(元)'];
     const m={};DB.assets.forEach(x=>{const k=x.inDept||'未指定';m[k]=m[k]||{n:0,s:0};m[k].n+=x.qty||1;m[k].s+=(x.amount||0)*(x.qty||1)});
@@ -15459,6 +15472,7 @@ async function exportReport(){
   await loadUserDir();
   const d=reportData();
   if(REP_TAB==='资产卡片')exportXLSX(`资产卡片_${todayStr()}.xlsx`,d.h,d.r,'资产卡片',null,FA_DATE_COLS,{widths:FA_WIDTHS,rowHt:FA_ROW_HT,dataFontSz:FA_DATA_FONT_SZ},[14]); /* 第15列 SN码按文本写入：纯数字不以科学计数法显示（如 25010023974） */
+  else if(REP_TAB==='库存表')exportXLSX(`库存表_${todayStr()}.xlsx`,d.h,d.r,'库存表',null,WH_DATE_COLS,{widths:WH_WIDTHS,rowHt:WH_ROW_HT},[8]); /* 第9列 SN码按文本写入；模板模式表头筛选箭头自动覆盖 B~M 全列（含「状态/领用人」） */
   else exportXLSX(`资产报表_${REP_TAB}_${todayStr()}.xlsx`,d.h,d.r,REP_TAB);
 }
 async function exportLedger(){
