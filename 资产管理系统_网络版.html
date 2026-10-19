@@ -13427,7 +13427,7 @@ function batchApplyIdle(){
   const isAdmin=ME.role==='admin';
   const myName=ME.displayName||ME.username;
   const userField=isAdmin
-    ? (USER_DIR.length?`<div style="display:flex;gap:8px">${deptUserPickHTML('ba-fdept','ba-user','','','— 选择领用人 —','ba-dept')}</div>`:'<input id="ba-user" placeholder="本机构暂无注册用户，可直接输入姓名" style="flex:1;padding:8px 12px;border:1px solid var(--line-2);border-radius:8px">')
+    ? `<input id="ba-user" list="ba-user-list" placeholder="输入或选择领用人（非注册用户也可）" style="width:100%">${USER_DIR.length?`<datalist id="ba-user-list">${USER_DIR.map(n=>`<option value="${esc(n)}">`).join('')}</datalist>`:''}`
     : `<input id="ba-user" value="${esc(myName)}" readonly>`;
   openModal(`<div class="dlg-head"><h3>批量领用申请 · ${assets.length} 台</h3><button class="x" onclick="closeModal()">×</button></div>
   <div class="dlg-body">
@@ -13440,7 +13440,7 @@ function batchApplyIdle(){
     </div>
   </div>
   <div class="dlg-foot"><button class="btn ghost" onclick="closeModal()">取消</button><button class="btn pri" onclick="batchSubmitApply()">提交申请（${assets.length} 台）</button></div>`);
-  loadUserDir().then(()=>{if(USER_DIR.length&&!$('#ba-fdept'))batchApplyIdle()});
+  loadUserDir().then(()=>{if(USER_DIR.length&&!$('#ba-user-list'))batchApplyIdle()}); // 名单就绪后重渲染补下拉提示
 }
 function batchSubmitApply(){
   const assets=batchSelAssets().filter(a=>a.status==='idle');
@@ -13449,7 +13449,7 @@ function batchSubmitApply(){
   if(!user)return toast('请选择领用人','err');
   const myName=ME.displayName||ME.username;
   if(ME.role!=='admin'&&user!==myName)return toast('普通用户仅能为本人提交领用申请','err');
-  if(ME.role==='admin'&&USER_DIR.length&&!USER_DIR.includes(user)&&user!==meName())return toast('领用人须为系统注册用户','err');
+  /* 领用人放开：非注册用户也可（管理员为任意姓名，普通用户仅限本人） */
   const dept=$('#ba-dept').value;
   if(!dept)return toast('请选择领用部门','err');
   const occ=appliedAssetIds();
@@ -13479,7 +13479,7 @@ function batchTransfer(){
     <div class="mut" style="font-size:12.5px;margin-bottom:10px">资产：${assets.map(a=>esc(a.code)).join('、')}</div>
     <div class="form-grid">
       <div class="fg"><label>转入领用部门 <span class="req">*</span></label><select id="bt-dept">${deptOpts('')}</select></div>
-      <div class="fg"><label>新领用人 <span class="req">*</span></label>${USER_DIR.length?`<div style="display:flex;gap:8px">${deptUserPickHTML('bt-fdept','bt-user','','','— 选择新领用人 —','bt-dept')}</div>`:'<input id="bt-user" placeholder="本机构暂无注册用户，可直接输入姓名" style="flex:1;padding:8px 12px;border:1px solid var(--line-2);border-radius:8px">'}</div>
+      <div class="fg"><label>新领用人 <span class="req">*</span> <span class="hint" style="font-size:11px">可直接输入任意姓名</span></label><input id="bt-user" list="bt-user-list" placeholder="输入或选择新领用人" style="width:100%">${USER_DIR.length?`<datalist id="bt-user-list">${USER_DIR.map(n=>`<option value="${esc(n)}">`).join('')}</datalist>`:''}</div>
       <div class="fg f2"><label>新存放地点</label><input id="bt-loc" placeholder="可空，保持原地点"></div>
     </div>
   </div>
@@ -13492,8 +13492,8 @@ function batchSubmitTransfer(){
   const nd=$('#bt-dept').value;
   if(!nd)return toast('请选择转入部门','err');
   const nu=$('#bt-user').value.trim();
-  if(!nu)return toast('请选择新领用人（从注册用户中选择）','err');
-  if(USER_DIR.length&&!USER_DIR.includes(nu)&&nu!==meName())return toast('新领用人须为系统注册用户','err');
+  if(!nu)return toast('请填写新领用人','err');
+  /* 新领用人放开：非注册用户也可（可从下拉选，也可直接输入任意姓名） */
   const nl=$('#bt-loc').value.trim();
   let made=0,skip=0;
   assets.forEach(a=>{
@@ -13677,6 +13677,8 @@ async function editAsset(id){
     <div class="fg"><label>存放地点（安装位置）</label><input id="ed-loc" value="${esc(x.location||'')}"></div>
     <div class="fg"><label>入库人</label>${USER_DIR.length?`<select id="ed-manager">${userOpts(x.manager,'— 选择入库人 —')}</select>`:`<input id="ed-manager" value="${esc(x.manager||'')}" placeholder="本机构暂无注册用户，可直接输入姓名" style="width:100%;padding:8px 12px;border:1px solid var(--line-2);border-radius:8px">`}</div>
     <div class="fg"><label>SN码（产品编码）</label><input id="ed-pc" value="${esc(x.productCode||'')}"></div>
+    <div class="fg"><label>领用人 <span class="hint">可直接输入任意姓名，非注册用户也可</span></label><input id="ed-user" value="${esc(x.user||'')}" list="ed-user-list" placeholder="留空 = 无人领用">${USER_DIR.length?`<datalist id="ed-user-list">${USER_DIR.map(n=>`<option value="${esc(n)}">`).join('')}</datalist>`:''}</div>
+    <div class="fg"><label>领用部门</label><input id="ed-userDept" value="${esc(x.userDept||'')}" list="ed-dept-list" placeholder="可输入或选择"><datalist id="ed-dept-list">${DB.depts.map(d=>`<option value="${esc(d)}">`).join('')}</datalist></div>
     </div>
     ${H4('② 厂商与日期')}
     <div class="form-grid">
@@ -13745,6 +13747,27 @@ function saveEdit(id){
   const npc=$('#ed-pc').value.trim();
   if(npc){const dup=productCodeTaken(npc,x.id);if(dup)return toast('产品编码 '+npc+' 已存在于资产 '+dup.code+'（'+esc(dup.name)+'），不能重复','err')}
   x.name=$('#ed-name').value.trim()||x.name;x.cat=$('#ed-cat').value;x.spec=$('#ed-spec').value.trim();x.qty=Number($('#ed-qty').value)||1;x.unit=$('#ed-unit').value.trim()||'台';x.amount=Number($('#ed-amount').value)||0;x.inDept=$('#ed-inDept').value;x.location=$('#ed-loc').value.trim();x.productCode=npc;x.manager=em;
+  /* 领用人直接编辑（可填非注册用户）：空↔有联动状态与领用日期，变更记入履历 */
+  const eu=$('#ed-user').value.trim();
+  const eud=$('#ed-userDept').value.trim();
+  const oldUser=x.user||'';
+  const oldDept=x.userDept||'';
+  if(eu!==oldUser){
+    const now=nowStr();
+    if(eu){
+      x.user=eu;x.userDept=eud;x.useDept=eud;
+      if(x.status==='idle'||x.status==='back'){x.status='inuse';addHistory(x,'台账领用',`台账直接编辑领用人：${oldUser?'由「'+oldUser+'」':'无人领用'} → 「${eu}（${eud||'—'}）」；状态 → 在用`)}
+      else addHistory(x,'台账领用',`台账直接编辑领用人：${oldUser?'由「'+oldUser+'」':'无人领用'} → 「${eu}（${eud||'—'}）」`);
+      x.receiveDate=now;
+    }else{
+      x.user='';x.userDept='';x.useDept='';
+      x.status='idle';x.receiveDate='';
+      addHistory(x,'台账领用',`台账直接编辑清除领用人：原「${oldUser}（${oldDept||'—'}）」；状态 → 闲置`);
+    }
+  }else if(eud!==oldDept&&(eu||eud)){
+    x.userDept=eud;x.useDept=eud;
+    if(eu)addHistory(x,'台账领用',`台账直接编辑领用部门：「${oldDept||'—'}」 → 「${eud||'—'}」`);
+  }
   /* 资产卡片字段（对齐导入模板）：未填/非法输入回落默认值 */
   const fd=faDefaults();
   x.useStatus=$('#ed-useStatus').value.trim()||fd.useStatus;
@@ -14550,11 +14573,11 @@ function submitApply(){
   if(!guard())return;
   const finUser=($('#ou-usel')?$('#ou-usel').value.trim():'')||($('#ou-user')?$('#ou-user').value.trim():''); // 以下拉选定值为优先（两条路径同步，实际总一致）
   if(!OUT.ids.length)return toast('请先勾选要领用的资产','err');
-  if(!finUser)return toast('请选择领用人（从注册用户中选择）','err');
-  // 普通用户只能为本人申请；管理员可为任意注册用户申请
+  if(!finUser)return toast('请填写领用人','err');
+  // 普通用户只能为本人申请；管理员可为任意人申请（非注册用户也可）
   const myName=ME.displayName||ME.username;
   if(ME.role!=='admin'&&finUser!==myName)return toast('普通用户仅能为本人提交领用申请','err');
-  if(ME.role==='admin'&&USER_DIR.length&&!USER_DIR.includes(finUser)&&finUser!==meName())return toast('领用人须为系统注册用户','err');
+  /* 领用人放开：管理员可为非注册用户代提领用申请 */
   const dept=$('#ou-dept').value,loc=$('#ou-loc').value.trim();
   if(!dept)return toast('请选择领用部门','err');
   const occ=appliedAssetIds();
@@ -14667,7 +14690,7 @@ function openIssue(id){
     <div class="kv-line"><b>资产编号</b><span>${esc(x.code)}</span></div>
     ${app?`<div class="kv-line"><b>信息来源</b><span style="color:var(--good)">已自动带入领用申请 ${esc(app.no)}（领用人 ${esc(app.by)}）· 如需修改请直接改下方字段</span></div>`:''}
     <div class="form-grid" style="grid-template-columns:repeat(2,1fr)">
-      <div class="fg"><label>领用人 <span class="req">*</span></label>${USER_DIR.length?`<div style="display:flex;gap:8px">${deptUserPickHTML('is-udept','is-user',(USER_DEPT[au]||''),au,'— 选择领用人 —')}</div><div class="mut" style="font-size:11.5px;margin-top:4px">先选部门再选领用人；领用部门自动取领用人所属部门</div>`:`<input id="is-user" value="${esc(au)}" placeholder="本机构暂无注册用户，可直接输入姓名" style="width:100%;padding:8px 12px;border:1px solid var(--line-2);border-radius:8px"><input id="is-dept" value="${esc(ad)}" placeholder="领用部门（必填）" style="width:100%;margin-top:6px;padding:8px 12px;border:1px solid var(--line-2);border-radius:8px">`}</div>
+      <div class="fg"><label>领用人 <span class="req">*</span> <span class="hint" style="font-size:11px">可直接输入任意姓名，非注册用户也可</span></label><input id="is-user" value="${esc(au)}" list="is-user-list" placeholder="输入或选择领用人" style="width:100%">${USER_DIR.length?`<datalist id="is-user-list">${USER_DIR.map(n=>`<option value="${esc(n)}">`).join('')}</datalist>`:''}<input id="is-dept" value="${esc(ad)}" list="is-dept-list" placeholder="领用部门（必填）" style="width:100%;margin-top:6px;padding:8px 12px;border:1px solid var(--line-2);border-radius:8px"><datalist id="is-dept-list">${DB.depts.map(d=>`<option value="${esc(d)}">`).join('')}</datalist><div class="mut" style="font-size:11.5px;margin-top:4px">领用部门默认带入申请单，可修改；非注册用户请自行填写部门</div></div>
       <div class="fg"><label>领取时间 <span class="req">*</span></label><input id="is-time" type="datetime-local" value="${nowStr().replace(' ','T')}"></div>
       <div class="fg"><label>存放地点</label><input id="is-loc" value="${esc(al)}"></div>
       <div class="fg f2"><label>经办人</label><input id="is-by" value="${esc(DB.role)}"></div>
@@ -14679,9 +14702,8 @@ function doIssue(id){
   const x=assetById(id);if(!x)return;
   const user=$('#is-user').value.trim();
   if(!user)return toast('请填写领用人','err');
-  if(USER_DIR.length&&!USER_DIR.includes(user)&&user!==meName())return toast('领用人须为系统注册用户','err');
-  // 领用部门：注册用户取所属部门；本机构暂无注册用户时由发放人手动填写
-  const dept=(USER_DIR.length?(USER_DEPT[user]||''):($('#is-dept')?$('#is-dept').value.trim():'')).trim();
+  /* 领用人放开：非注册用户也可；领用部门从输入框取（注册用户可下拉提示自动选） */
+  const dept=($('#is-dept')?$('#is-dept').value.trim():(USER_DIR.length?(USER_DEPT[user]||''):'')).trim();
   if(!dept)return toast(`「${user}」未填写领用部门，请补充`,'err');
   const t=$('#is-time').value.replace('T',' ');
   x.status='inuse';x.user=user;x.userDept=dept;x.useDept=dept;x.receiveDate=t;x.location=$('#is-loc').value.trim()||x.location;
@@ -14900,7 +14922,7 @@ function renderTransferDlg(x){
         <select id="tr-fdept" onchange="trDeptChange()" title="转入领用部门" style="min-width:110px">${trFOpts}</select>
         <select id="tr-usel" onchange="trSyncFromSel()" style="flex:1;min-width:110px">${trUOpts}</select>
       </div>
-      <div class="mut" style="font-size:11.5px;margin-top:4px">先选转入部门再选新领用人（可搜索姓名 / 部门，选定后部门自动带入）；不可选当前领用人（${esc(x.user||'—')}）本人</div>`:'<input id="tr-newuser" placeholder="该机构暂无注册用户，可直接输入姓名" style="width:100%;padding:8px 12px;border:1px solid var(--line-2);border-radius:8px">'}</div>
+      <div class="mut" style="font-size:11.5px;margin-top:4px">先选转入部门再选新领用人（可搜索姓名 / 部门，选定后部门自动带入；<b>也可直接输入非注册用户姓名</b>）；不可填当前领用人（${esc(x.user||'—')}）本人</div>`:'<input id="tr-newuser" placeholder="可直接输入任意姓名" style="width:100%;padding:8px 12px;border:1px solid var(--line-2);border-radius:8px">'}</div>
       <div class="fg"><label>新存放地点</label><input id="tr-newloc" placeholder="如：外科楼 2F-205"></div>
     </div>
   </div>
@@ -14919,9 +14941,10 @@ function doTransfer(id){
   const isCross=org!==CUR_ORG;
   const dir=trTargetDir();
   const nu=$('#tr-newuser')?$('#tr-newuser').value.trim():'';
-  if(!nu)return toast('请选择新领用人（从注册用户中选择）','err');
-  if(dir.names.length&&!dir.names.includes(nu))return toast('新领用人须为'+(isCross?esc(orgName(org))+'的':'')+'注册用户','err');
-  if(nu===x.user)return toast(`新领用人不能是当前领用人（${esc(x.user)}），请选择其他用户`,'err');
+  if(!nu)return toast('请填写新领用人','err');
+  /* 新领用人放开：本机构可填非注册用户；跨机构仍须为目标机构注册用户（服务器同步校验，机构归属可控） */
+  if(isCross&&dir.names.length&&!dir.names.includes(nu))return toast('跨机构转移的新领用人须为'+esc(orgName(org))+'的注册用户（本机构转移可填任意姓名）','err');
+  if(nu===x.user)return toast(`新领用人不能是当前领用人（${esc(x.user)}），请填写其他姓名`,'err');
   const ndAuto=dir.dept[nu]||'';
   const nd=ndAuto||($('#tr-fdept')?$('#tr-fdept').value:'');
   if(!nd)return toast('请选择转入部门（或选择有部门的领用人自动带入）','err');
