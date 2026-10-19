@@ -13434,7 +13434,7 @@ function batchApplyIdle(){
     <div class="mut" style="font-size:12.5px;margin-bottom:10px">资产：${assets.map(a=>esc(a.code)).join('、')}</div>
     <div class="form-grid">
       <div class="fg"><label>领用人 <span class="req">*</span></label>${userField}</div>
-      <div class="fg"><label>领用部门 <span class="req">*</span></label><select id="ba-dept">${deptOpts(isAdmin?'':(USER_DEPT[myName]||''))}</select></div>
+      <div class="fg"><label>领用部门 <span class="hint" style="font-size:11px">可直接填写，非必填</span></label><input id="ba-dept" list="ba-dept-list" value="${esc(isAdmin?'':(USER_DEPT[myName]||''))}" placeholder="可输入或选择（可留空）"><datalist id="ba-dept-list">${DB.depts.map(d=>`<option value="${esc(d)}">`).join('')}</datalist></div>
       <div class="fg"><label>存放地点</label><input id="ba-loc"></div>
       <div class="fg f2"><label>用途说明</label><input id="ba-purpose"></div>
     </div>
@@ -13450,8 +13450,7 @@ function batchSubmitApply(){
   const myName=ME.displayName||ME.username;
   if(ME.role!=='admin'&&user!==myName)return toast('普通用户仅能为本人提交领用申请','err');
   /* 领用人放开：非注册用户也可（管理员为任意姓名，普通用户仅限本人） */
-  const dept=$('#ba-dept').value;
-  if(!dept)return toast('请选择领用部门','err');
+  const dept=$('#ba-dept').value.trim(); /* 领用部门放开：可直接填写，非必填（留空提交） */
   const occ=appliedAssetIds();
   const clash=assets.filter(a=>occ.has(a.id));
   if(clash.length)return toast(`提交失败：${clash.map(a=>a.code).join('、')} 已有申请处理中`,'err');
@@ -13478,7 +13477,7 @@ function batchTransfer(){
   <div class="dlg-body">
     <div class="mut" style="font-size:12.5px;margin-bottom:10px">资产：${assets.map(a=>esc(a.code)).join('、')}</div>
     <div class="form-grid">
-      <div class="fg"><label>转入领用部门 <span class="req">*</span></label><select id="bt-dept">${deptOpts('')}</select></div>
+      <div class="fg"><label>转入领用部门 <span class="hint" style="font-size:11px">可直接填写，非必填</span></label><input id="bt-dept" list="bt-dept-list" placeholder="可输入或选择（可留空）"><datalist id="bt-dept-list">${DB.depts.map(d=>`<option value="${esc(d)}">`).join('')}</datalist></div>
       <div class="fg"><label>新领用人 <span class="req">*</span> <span class="hint" style="font-size:11px">可直接输入任意姓名</span></label><input id="bt-user" list="bt-user-list" placeholder="输入或选择新领用人" style="width:100%">${USER_DIR.length?`<datalist id="bt-user-list">${USER_DIR.map(n=>`<option value="${esc(n)}">`).join('')}</datalist>`:''}</div>
       <div class="fg f2"><label>新存放地点</label><input id="bt-loc" placeholder="可空，保持原地点"></div>
     </div>
@@ -13489,8 +13488,7 @@ function batchSubmitTransfer(){
   if(!approveOnly())return;
   const assets=batchSelAssets().filter(a=>a.status==='inuse');
   if(!assets.length)return toast('请先勾选「在用」状态的资产','err');
-  const nd=$('#bt-dept').value;
-  if(!nd)return toast('请选择转入部门','err');
+  const nd=$('#bt-dept').value.trim(); /* 转入部门放开：可直接填写，非必填（留空提交） */
   const nu=$('#bt-user').value.trim();
   if(!nu)return toast('请填写新领用人','err');
   /* 新领用人放开：非注册用户也可（可从下拉选，也可直接输入任意姓名） */
@@ -13501,8 +13499,8 @@ function batchSubmitTransfer(){
     const old=`${a.user||'—'}（${a.userDept||'—'}）`;
     a.userDept=nd;a.user=nu;a.useDept=nd;if(nl)a.location=nl;
     const zy=nextDocNo('ZY');
-    addHistory(a,'部门转移',`由「${old}」转移至「${nu}（${nd}）」（批量）；新地点：${nl||'—'}；编号 ${zy}`);
-    addRecord({no:zy,type:'转移',date:todayStr(),by:DB.role,dept:`→${nd}`,detail:`${a.name}（${a.code}）`,status:'已完成'});
+    addHistory(a,'部门转移',`由「${old}」转移至「${nu}（${nd||'—'}）」（批量）；新地点：${nl||'—'}；编号 ${zy}`);
+    addRecord({no:zy,type:'转移',date:todayStr(),by:DB.role,dept:`→${nd||'—'}`,detail:`${a.name}（${a.code}）`,status:'已完成'});
     made++;
   });
   save();closeModal();LED.sel=[];
@@ -14388,7 +14386,7 @@ function pendAppOf(aid){
 }
 /* 领用人选项：仅显示所选部门的注册用户（未选部门时提示先选部门） */
 function ouUserOptionsByDept(dept,sel){
-  if(!dept)return '<option value="">— 请先选择领用部门 —</option>';
+  if(!dept)return '<option value="">— 填领用部门可过滤 —</option>';
   const users=USER_DIR.filter(n=>(USER_DEPT[n]||'')===dept);
   return '<option value="">— 选择领用人 —</option>'+users.map(n=>`<option value="${esc(n)}" ${n===sel?'selected':''}>${esc(n)}</option>`).join('')+(users.length?'':'<option value="" disabled>（该部门暂无用户）</option>');
 }
@@ -14432,7 +14430,7 @@ function renderOutbound(){
         <div id="ou-user-pop" style="display:none;position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:30;background:#fff;border:1px solid var(--line-2);border-radius:8px;box-shadow:0 8px 24px rgba(20,40,80,.13);max-height:200px;overflow:auto"></div>
       </div>
       <select id="ou-usel" onchange="OUT.user=this.value;const i=document.getElementById('ou-user');if(i)i.value=this.value" style="margin-top:8px">${dirReady?ouUserOptionsByDept(OUT.dept,OUT.user):'<option value="">（本机构暂无注册用户，请在输入框直接输入姓名）</option>'}</select>
-      <div class="mut" style="font-size:11.5px;margin-top:4px">先选领用部门，可搜索或下拉选择领用人</div>`
+      <div class="mut" style="font-size:11.5px;margin-top:4px">领用部门可留空；可搜索或下拉选择领用人</div>`
     : `<input id="ou-user" value="${esc(myName)}" readonly style="background:#f6f8fa"><div class="mut" style="font-size:11.5px;margin-top:4px">普通用户仅能为本人申请（${esc(myName)}）</div>`;
   $('#view-outbound').innerHTML=`
   <div class="grid g2">
@@ -14451,7 +14449,7 @@ function renderOutbound(){
       </div>
       <div class="btn-row mt12"><span class="mut">共 <b id="ou-total">0</b> 台可领用 · 已选 <b id="ou-count">${OUT.ids.length}</b> 台</span></div>
       <div class="form-grid mt12" style="grid-template-columns:repeat(2,1fr);${OUT.ids.length?'':'opacity:.45;pointer-events:none'}" id="ou-form">
-        <div class="fg"><label>领用部门 <span class="req">*</span></label><select id="ou-dept" onchange="OUT.dept=this.value;const u=document.getElementById('ou-usel');if(u)u.innerHTML=ouUserOptionsByDept(this.value,OUT.user)">${deptOpts(OUT.dept||(isAdmin?'':(USER_DEPT[myName]||'')))}</select></div>
+        <div class="fg"><label>领用部门 <span class="hint" style="font-size:11px">可直接填写，非必填</span></label><input id="ou-dept" list="ou-dept-list" value="${esc(OUT.dept||(isAdmin?'':(USER_DEPT[myName]||'')))}" placeholder="可输入或选择（可留空）" oninput="OUT.dept=this.value;const u=document.getElementById('ou-usel');if(u)u.innerHTML=ouUserOptionsByDept(this.value,OUT.user)"><datalist id="ou-dept-list">${DB.depts.map(d=>`<option value="${esc(d)}">`).join('')}</datalist></div>
         <div class="fg"><label>领用人 <span class="req">*</span></label>${userField}</div>
         <div class="fg"><label>存放地点</label><input id="ou-loc" value="${esc(OUT.loc)}"></div>
         <div class="fg"><label>用途说明</label><input id="ou-purpose" value="${esc(OUT.purpose)}"></div>
@@ -14578,8 +14576,7 @@ function submitApply(){
   const myName=ME.displayName||ME.username;
   if(ME.role!=='admin'&&finUser!==myName)return toast('普通用户仅能为本人提交领用申请','err');
   /* 领用人放开：管理员可为非注册用户代提领用申请 */
-  const dept=$('#ou-dept').value,loc=$('#ou-loc').value.trim();
-  if(!dept)return toast('请选择领用部门','err');
+  const dept=$('#ou-dept').value.trim(),loc=$('#ou-loc').value.trim(); /* 领用部门放开：可直接填写，非必填（留空提交） */
   const occ=appliedAssetIds();
     const clash=OUT.ids.filter(id=>occ.has(id));
   if(clash.length){
@@ -14637,7 +14634,7 @@ function appDetailModal(rid){
   }).join('');
   openModal(`<div class="dlg-head"><h3>领用申请 ${esc(r.no)} · 逐台审批</h3><button class="x" onclick="closeModal()">×</button></div>
   <div class="dlg-body">
-    <div class="kv-line"><b>申请人</b><span>${esc(r.by)}（${esc(r.dept)}）</span></div>
+    <div class="kv-line"><b>申请人</b><span>${esc(r.by)}（${esc(r.dept||'—')}）</span></div>
     <div class="kv-line"><b>用途说明</b><span>${esc(r.purpose||'—')}</span></div>
     ${r.loc?`<div class="kv-line"><b>存放地点</b><span>${esc(r.loc)}</span></div>`:''}
     <div class="tbl-wrap mt12" style="max-height:320px;overflow:auto"><table class="tbl"><thead><tr><th>编号</th><th>名称</th><th>状态</th><th>操作</th></tr></thead><tbody>${rows}</tbody></table></div>
@@ -14654,7 +14651,7 @@ function resolveAsset(rid,aid,ok){
   if(ok){
     if(a.status!=='idle')return toast(`「${a.name}」当前非闲置状态，无法通过`,'err');
     a.status='pend';
-    addHistory(a,'领用审批通过',`领用人：${r.by}；领用部门：${r.dept}；资产锁定为待发放（申请 ${r.no}）`,'');
+    addHistory(a,'领用审批通过',`领用人：${r.by}；领用部门：${r.dept||'—'}；资产锁定为待发放（申请 ${r.no}）`,'');
     r.resolved[aid]='ok';
   }else{
     if(a.status==='pend')a.status='idle';
@@ -14671,7 +14668,7 @@ function approveAllPending(rid){
   (r.assetIds||[]).forEach(aid=>{
     if(appAssetStatus(r,aid))return;
     const a=assetById(aid);
-    if(a&&a.status==='idle'){a.status='pend';addHistory(a,'领用审批通过',`领用人：${r.by}；领用部门：${r.dept}；资产锁定为待发放（申请 ${r.no}）`,'');r.resolved=r.resolved||{};r.resolved[aid]='ok';okCnt++}
+          if(a&&a.status==='idle'){a.status='pend';addHistory(a,'领用审批通过',`领用人：${r.by}；领用部门：${r.dept||'—'}；资产锁定为待发放（申请 ${r.no}）`,'');r.resolved=r.resolved||{};r.resolved[aid]='ok';okCnt++}
     else{r.resolved=r.resolved||{};r.resolved[aid]='rejected';skip++}
   });
   refreshAppStatus(r);save();closeModal();toast(`已全部通过：${okCnt} 台${skip?`（${skip} 台状态异常自动驳回）`:''}`);renderOutbound();
@@ -14703,12 +14700,11 @@ function doIssue(id){
   const user=$('#is-user').value.trim();
   if(!user)return toast('请填写领用人','err');
   /* 领用人放开：非注册用户也可；领用部门从输入框取（注册用户可下拉提示自动选） */
-  const dept=($('#is-dept')?$('#is-dept').value.trim():(USER_DIR.length?(USER_DEPT[user]||''):'')).trim();
-  if(!dept)return toast(`「${user}」未填写领用部门，请补充`,'err');
+  const dept=($('#is-dept')?$('#is-dept').value.trim():(USER_DIR.length?(USER_DEPT[user]||''):'')).trim(); /* 领用部门放开：非必填（留空发放） */
   const t=$('#is-time').value.replace('T',' ');
   x.status='inuse';x.user=user;x.userDept=dept;x.useDept=dept;x.receiveDate=t;x.location=$('#is-loc').value.trim()||x.location;
   const ck=nextDocNo('CK');
-  addHistory(x,'出库发放',`领用人：${user}；领用部门：${dept}；领取时间：${t}；出库编号 ${ck}；已生成二维码（贴于实物，扫码可查看领用信息）`);
+  addHistory(x,'出库发放',`领用人：${user}；领用部门：${dept||'—'}；领取时间：${t}；出库编号 ${ck}；已生成二维码（贴于实物，扫码可查看领用信息）`);
   addRecord({no:ck,type:'出库',date:t.slice(0,10),by:$('#is-by').value.trim()||DB.role,dept,detail:`${x.name} ${x.qty}${x.unit}（领用人：${user}）`,status:'已完成'});
   save();closeModal();toast(`已发放并生成二维码`);
   confirmDlg(`「${esc(x.name)}」已发放给 <b>${esc(user)}</b>，是否需要立即下载/打印二维码（贴于实物）？`,()=>downloadQR(id),'下载二维码',false);
@@ -14861,12 +14857,9 @@ function trUserPick(n){
   inp.value=n;
   const pop=document.getElementById('tr-newuser-pop');if(pop)pop.style.display='none';
   const d=trTargetDir().dept[n]||'';
-  // 合并后：直接把转入部门设为该用户所属部门（无部门则保持当前选择）
+  // 合并后：直接把转入部门设为该用户所属部门（无部门则保持当前填写）
   const deptSel=document.getElementById('tr-fdept');
-  if(d&&deptSel){
-    if(![...deptSel.options].some(o=>o.value===d))deptSel.insertAdjacentHTML('beforeend',`<option value="${esc(d)}">${esc(d)}</option>`);
-    deptSel.value=d;
-  }
+  if(d&&deptSel)deptSel.value=d;
   trDeptChange();
   const usel=document.getElementById('tr-usel');if(usel)usel.value=n;
 }
@@ -14905,7 +14898,6 @@ function renderTransferDlg(x){
   const excl=x.user||'';
   const uList=dir.names.filter(n=>n!==excl);
   const deptList=isCross?[...new Set(Object.values(dir.dept).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'zh')):userDeptList();
-  const trFOpts='<option value="">— 选择转入部门 —</option>'+deptList.map(d=>`<option value="${esc(d)}">${esc(d)}</option>`).join('');
   const trUOpts='<option value="">— 选择新领用人 —</option>'+uList.map(n=>`<option value="${esc(n)}">${esc(n)}${dir.dept[n]?'（'+esc(dir.dept[n])+'）':''}</option>`).join('');
   const orgSel=cross?`<div class="fg f2"><label>转入机构 <span class="hint">${isCross?'跨机构转移：可选资产是否一并转入':'默认本机构'}</span></label><select id="tr-org" onchange="trOrgChange(this.value)">${ORGS.map(o=>`<option value="${o.id}" ${(String(o.id)===String(CUR_ORG)&&!TR.org)||String(o.id)===String(TR.org)?'selected':''}>${esc(o.name)}${String(o.id)===String(CUR_ORG)?'（本机构）':''}</option>`).join('')}</select></div>`:'';
   const migrateBox=isCross?`<div class="fg f2"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px"><input type="checkbox" id="tr-migrate"> <span>将资产<b>一并转入</b>该机构（归属变更，退回时在该机构退回）</span></label><div class="mut" style="font-size:11.5px;margin-top:4px">不勾选（默认）：资产仍归本机构所有，仅更换领用人，退回时退回本机构</div></div>`:'';
@@ -14917,12 +14909,12 @@ function renderTransferDlg(x){
         <input id="tr-newuser" placeholder="输入姓名搜索选择…" autocomplete="off" style="width:100%" oninput="trUserSearch(this.value)" onfocus="trUserSearch(this.value)" onblur="setTimeout(()=>{const p=document.getElementById('tr-newuser-pop');if(p)p.style.display='none'},180)">
         <div id="tr-newuser-pop" style="display:none;position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:30;background:#fff;border:1px solid var(--line-2);border-radius:8px;box-shadow:0 8px 24px rgba(20,40,80,.13);max-height:220px;overflow:auto"></div>
       </div>
-      <div class="mut" style="font-size:11.5px;margin:6px 0 0">转入领用部门 <span class="req">*</span></div>
+      <div class="mut" style="font-size:11.5px;margin:6px 0 0">转入领用部门 <span class="hint" style="font-size:11px">可直接填写，非必填</span></div>
       <div style="display:flex;gap:8px;margin-top:8px">
-        <select id="tr-fdept" onchange="trDeptChange()" title="转入领用部门" style="min-width:110px">${trFOpts}</select>
+        <input id="tr-fdept" list="tr-fdept-list" placeholder="可输入或选择" title="转入领用部门" style="min-width:110px" oninput="trDeptChange()"><datalist id="tr-fdept-list">${deptList.map(d=>`<option value="${esc(d)}">`).join('')}</datalist>
         <select id="tr-usel" onchange="trSyncFromSel()" style="flex:1;min-width:110px">${trUOpts}</select>
       </div>
-      <div class="mut" style="font-size:11.5px;margin-top:4px">先选转入部门再选新领用人（可搜索姓名 / 部门，选定后部门自动带入；<b>也可直接输入非注册用户姓名</b>）；不可填当前领用人（${esc(x.user||'—')}）本人</div>`:'<input id="tr-newuser" placeholder="可直接输入任意姓名" style="width:100%;padding:8px 12px;border:1px solid var(--line-2);border-radius:8px">'}</div>
+      <div class="mut" style="font-size:11.5px;margin-top:4px">转入部门可留空；可搜索姓名 / 部门选择新领用人（选定后部门自动带入），<b>也可直接输入非注册用户姓名</b>；不可填当前领用人（${esc(x.user||'—')}）本人</div>`:'<input id="tr-newuser" placeholder="可直接输入任意姓名" style="width:100%;padding:8px 12px;border:1px solid var(--line-2);border-radius:8px"><input id="tr-fdept" list="tr-fdept-list" placeholder="转入领用部门（可留空）" style="width:100%;margin-top:6px;padding:8px 12px;border:1px solid var(--line-2);border-radius:8px"><datalist id="tr-fdept-list">'+DB.depts.map(d=>`<option value="${esc(d)}">`).join('')+'</datalist>'}</div>
       <div class="fg"><label>新存放地点</label><input id="tr-newloc" placeholder="如：外科楼 2F-205"></div>
     </div>
   </div>
@@ -14946,22 +14938,21 @@ function doTransfer(id){
   if(isCross&&dir.names.length&&!dir.names.includes(nu))return toast('跨机构转移的新领用人须为'+esc(orgName(org))+'的注册用户（本机构转移可填任意姓名）','err');
   if(nu===x.user)return toast(`新领用人不能是当前领用人（${esc(x.user)}），请填写其他姓名`,'err');
   const ndAuto=dir.dept[nu]||'';
-  const nd=ndAuto||($('#tr-fdept')?$('#tr-fdept').value:'');
-  if(!nd)return toast('请选择转入部门（或选择有部门的领用人自动带入）','err');
+  const nd=(ndAuto||($('#tr-fdept')?$('#tr-fdept').value.trim():'')).trim(); /* 转入部门放开：可直接填写，非必填（留空=该领用人无部门） */
   if(!isCross){
     const nl2=$('#tr-newloc').value.trim()||x.location;
     const old=`${x.user||'—'}（${x.userDept||'—'}）`;
     x.userDept=nd;x.user=nu;x.useDept=nd;x.location=nl2;
     const zy=nextDocNo('ZY');
-    addHistory(x,'部门转移',`由「${old}」转移至「${nu}（${nd}）」；新地点：${nl2||'—'}；二维码扫码信息已自动更新；编号 ${zy}`);
-    addRecord({no:zy,type:'转移',date:todayStr(),by:DB.role,dept:`→${nd}`,detail:`${x.name}（${x.code}）`,status:'已完成'});
+    addHistory(x,'部门转移',`由「${old}」转移至「${nu}（${nd||'—'}）」；新地点：${nl2||'—'}；二维码扫码信息已自动更新；编号 ${zy}`);
+    addRecord({no:zy,type:'转移',date:todayStr(),by:DB.role,dept:`→${nd||'—'}`,detail:`${x.name}（${x.code}）`,status:'已完成'});
     save();closeModal();toast('转移完成，二维码扫码信息已自动更新（无需重打）');renderTransfer();
     return;
   }
   /* 跨机构转移：走服务器接口（可选资产一并迁移到目标机构） */
   const migrate=$('#tr-migrate')?$('#tr-migrate').checked:false;
   const nl=$('#tr-newloc').value.trim()||x.location;
-  confirmDlg(`确认跨机构转移「<b>${esc(x.name)}</b>（${esc(x.code)}）」？<br><span style="color:var(--gray)">${esc(x.user||'—')}（${esc(x.userDept||'—')}）→ <b>${esc(nu)}（${esc(nd)}）· ${esc(orgName(org))}</b><br>${migrate?`资产将<b style="color:#e5484d">一并转入 ${esc(orgName(org))}</b>（归属变更，退回时在该机构退回）`:`资产仍归本机构（${esc(orgName(CUR_ORG))}）所有，退回时退回本机构`}；二维码扫码信息自动更新。</span>`,async ()=>{
+  confirmDlg(`确认跨机构转移「<b>${esc(x.name)}</b>（${esc(x.code)}）」？<br><span style="color:var(--gray)">${esc(x.user||'—')}（${esc(x.userDept||'—')}）→ <b>${esc(nu)}（${esc(nd||'—')}）· ${esc(orgName(org))}</b><br>${migrate?`资产将<b style="color:#e5484d">一并转入 ${esc(orgName(org))}</b>（归属变更，退回时在该机构退回）`:`资产仍归本机构（${esc(orgName(CUR_ORG))}）所有，退回时退回本机构`}；二维码扫码信息自动更新。</span>`,async ()=>{
     const {ok,status,j}=await apiFetch('/api/assets/cross-transfer',{fromOrg:CUR_ORG,toOrg:org,assetId:x.id,user:nu,dept:nd,loc:nl,migrate});
     if(ok&&j.ok){
       closeModal();
