@@ -13310,7 +13310,8 @@ function renderLedger(){
       <button class="btn sm" id="bb-edit" ${nSel?'':'disabled'} onclick="batchEditModal()">批量编辑（${nSel}）</button>
       <button class="btn sm pri" id="bb-apply" ${selIdle.length?'':'disabled'} onclick="batchApplyIdle()">批量领用申请（${selIdle.length}）</button>
       ${ME.role==='admin'?`<button class="btn sm" id="bb-reshelve" ${selBack.length?'':'disabled'} onclick="batchReshelve()">批量点收入库（${selBack.length}）</button>
-      <button class="btn sm" id="bb-transfer" ${selInuse.length?'':'disabled'} onclick="batchTransfer()">批量转移（${selInuse.length}）</button>`:''}
+      <button class="btn sm" id="bb-transfer" ${selInuse.length?'':'disabled'} onclick="batchTransfer()">批量转移（${selInuse.length}）</button>
+      <button class="btn sm" id="bb-consume" ${selIdle.length?'':'disabled'} onclick="consumeOutDlg()" title="耗材出库：资产移出台账不再追踪，记录可在报表中心查看与导出">出库耗材（${selIdle.length}）</button>`:''}
       <button class="btn sm ghost" id="bb-print" ${selInuse.length?'':'disabled'} onclick="batchPrintQR()">批量打印二维码（${selInuse.length}）</button>
       <button class="btn sm danger" id="bb-del" ${nSel?'':'disabled'} onclick="batchDel()">批量删除（${nSel}）</button>
       <button class="btn sm" id="bb-codechk" onclick="codeCheckDlg()" title="检测资产编号是否连续（删除后未前移的空洞），可一键重排">🔢 编号体检</button>
@@ -13360,6 +13361,7 @@ function refreshBatchBar(){
   up('#bb-edit','批量编辑',LED.sel.length);
   up('#bb-reshelve','批量点收入库',nBack);
   up('#bb-transfer','批量转移',nInuse);
+  up('#bb-consume','出库耗材',nIdle);
   up('#bb-print','批量打印二维码',nInuse);
   up('#bb-del','批量删除',LED.sel.length);
 }
@@ -13506,6 +13508,44 @@ function batchSubmitTransfer(){
   save();closeModal();LED.sel=[];
   toast(skip?`完成 ${made} 台，${skip} 台领用人未变已跳过`:`批量转移完成 ${made} 台`);
   renderLedger();
+}
+/* ===== 出库耗材：闲置资产出库消耗，移出台账不再追踪；单据含明细快照，报表中心可查可导出 ===== */
+function consumeOutDlg(){
+  if(!approveOnly())return;
+  const assets=batchSelAssets().filter(a=>a.status==='idle');
+  if(!assets.length)return toast('请先勾选「闲置」状态的资产（在用资产须先退回再出库耗材）','err');
+  const total=assets.reduce((t,a)=>t+(Number(a.amount)||0),0);
+  openModal(`<div class="dlg-head"><h3>出库耗材 · ${assets.length} 台</h3><button class="x" onclick="closeModal()">×</button></div>
+  <div class="dlg-body">
+    <div class="mut" style="font-size:12.5px;margin-bottom:10px">出库后资产<b style="color:#e5484d">从台账移除、不再追踪</b>（正常消耗，不重排编号）；出库记录永久保留，可在 报表中心 → 耗材出库 查看与导出 Excel。</div>
+    <div class="form-grid">
+      <div class="fg"><label>领用部门 <span class="hint" style="font-size:11px">可直接填写，非必填</span></label><input id="cs-dept" list="cs-dept-list" placeholder="可输入或选择（可留空）"><datalist id="cs-dept-list">${DB.depts.map(d=>`<option value="${esc(d)}">`).join('')}</datalist></div>
+      <div class="fg"><label>使用人 <span class="hint" style="font-size:11px">可直接填写，非必填</span></label><input id="cs-user" list="cs-user-list" placeholder="可输入任意姓名（可留空）">${USER_DIR.length?`<datalist id="cs-user-list">${USER_DIR.map(n=>`<option value="${esc(n)}">`).join('')}</datalist>`:''}</div>
+      <div class="fg f2"><label>用途说明</label><input id="cs-purpose" placeholder="如：日常办公耗材领用 / 科室消耗"></div>
+    </div>
+    <div class="tbl-wrap mt12" style="max-height:240px;overflow:auto"><table class="tbl"><thead><tr><th>编号</th><th>名称</th><th>分类</th><th>单位</th><th class="num">金额</th></tr></thead><tbody>${assets.map(a=>`<tr><td><b>${esc(a.code)}</b></td><td>${esc(a.name)}</td><td>${esc(a.cat)}</td><td>${esc(a.unit||'台')}</td><td class="num">${fmtMoney(a.amount)}</td></tr>`).join('')}</tbody></table></div>
+    <div class="mut" style="font-size:12px;margin-top:8px">合计 ${assets.length} 台 · ${fmtMoney(total)} 元</div>
+  </div>
+  <div class="dlg-foot"><button class="btn ghost" onclick="closeModal()">取消</button><button class="btn danger" onclick="doConsumeOut()">确认出库耗材（${assets.length} 台）</button></div>`);
+}
+function doConsumeOut(){
+  if(!approveOnly())return;
+  const assets=batchSelAssets().filter(a=>a.status==='idle');
+  if(!assets.length)return toast('请先勾选闲置资产','err');
+  const dept=$('#cs-dept').value.trim(),user=$('#cs-user').value.trim(),purpose=$('#cs-purpose').value.trim();
+  confirmDlg(`确定将 <b>${assets.length}</b> 台资产出库耗材？<br><span style="color:var(--gray)">资产将<b style="color:#e5484d">从台账移除、不再追踪</b>（正常消耗，不重排编号）；出库记录保留，可到 报表中心 → 耗材出库 查看与导出。</span>`,()=>{
+    const no=nextDocNo('HC');
+    /* 明细快照：资产删除后记录仍完整可查（编号/名称/规格/SN/金额/部门等） */
+    const items=assets.map(a=>({code:a.code||'',name:a.name||'',cat:a.cat||'',spec:a.spec||'',productCode:a.productCode||'',qty:a.qty||1,unit:a.unit||'台',amount:Number(a.amount)||0,inDept:a.inDept||'',location:a.location||''}));
+    addRecord({no,type:'耗材出库',date:todayStr(),by:DB.role,dept,user,purpose,detail:`耗材出库 ${assets.length} 台（${assets.map(a=>a.code).join('、')}）`,status:'已完成',assetIds:assets.map(a=>a.id),items});
+    /* 移出台账 + 清盘点引用；不重排编号（正常消耗：重排会使在库资产编号变化、已打印二维码失效） */
+    const ids=new Set(assets.map(a=>a.id));
+    DB.assets=DB.assets.filter(a=>!ids.has(a.id));
+    DB.stocktakes.forEach(st=>st.items=st.items.filter(i=>!ids.has(i.assetId)));
+    save();closeModal();LED.sel=[];
+    toast(`耗材出库完成：${assets.length} 台已移出台账（单号 ${no}，报表中心 → 耗材出库 可查）`);
+    renderLedger();
+  },'出库耗材',true);
 }
 /* ===== 删除后编号自动重排：剩余资产按原编号顺序从 PRL+年份+0001 重新连续编号 ===== */
 function renumberAssets(){
@@ -15415,7 +15455,7 @@ function ledgerDeptUserCmp(a,b){
 }
 let REP_TAB='台账';
 function renderReport(){
-  const tabs=[['台账','台账'],['入库','入库明细'],['出库','出库发放'],['转移退回','转移与退回'],['盘点差异','盘点差异'],['资产卡片','资产卡片'],['库存表','库存表'],['部门汇总','部门汇总'],['Excel回填','Excel回填']].map(([k,t])=>`<button class="${REP_TAB===k?'on':''}" onclick="REP_TAB='${k}';renderReport()">${t}</button>`).join('');
+  const tabs=[['台账','台账'],['入库','入库明细'],['出库','出库发放'],['转移退回','转移与退回'],['耗材出库','耗材出库'],['盘点差异','盘点差异'],['资产卡片','资产卡片'],['库存表','库存表'],['部门汇总','部门汇总'],['Excel回填','Excel回填']].map(([k,t])=>`<button class="${REP_TAB===k?'on':''}" onclick="REP_TAB='${k}';renderReport()">${t}</button>`).join('');
   $('#view-report').innerHTML=`<div class="card">
     <div class="filterbar">
       <div class="qrtabs">${tabs}</div>
@@ -15444,6 +15484,13 @@ function reportData(){
   }else if(REP_TAB==='转移退回'){
     d.h=['单据编号','类型','日期','经办人','部门','明细','状态'];
     d.r=DB.records.filter(r=>r.type==='转移'||r.type==='退回').map(r=>[r.no,r.type,r.date,r.by,r.dept,r.detail,r.status]);
+  }else if(REP_TAB==='耗材出库'){
+    d.h=['出库编号','日期','经办人','领用部门','使用人','资产编号','资产名称','分类','规格','SN码','数量','金额(元)','原存放地点','用途'];
+    DB.records.filter(r=>r.type==='耗材出库').forEach(r=>{
+      (r.items&&r.items.length?r.items:[{code:'',name:'',cat:'',spec:'',productCode:'',qty:'',unit:'',amount:'',inDept:'',location:''}]).forEach(it=>{
+        d.r.push([r.no,r.date,r.by,r.dept||'—',r.user||'—',it.code,it.name,it.cat,it.spec,it.productCode,it.qty?it.qty+it.unit:'',it.amount||0,it.location,r.purpose||'']);
+      });
+    });
   }else if(REP_TAB==='盘点差异'){
     d.h=['盘点编号','盘点名称','资产编号','资产名称','产品编码','差异类型','存放地点','领用人','处理建议'];
     DB.stocktakes.forEach(p=>{
@@ -15487,6 +15534,7 @@ async function exportReport(){
   const d=reportData();
   if(REP_TAB==='资产卡片')exportXLSX(`资产卡片_${todayStr()}.xlsx`,d.h,d.r,'资产卡片',null,FA_DATE_COLS,{widths:FA_WIDTHS,rowHt:FA_ROW_HT,dataFontSz:FA_DATA_FONT_SZ},[14]); /* 第15列 SN码按文本写入：纯数字不以科学计数法显示（如 25010023974） */
   else if(REP_TAB==='库存表')exportXLSX(`库存表_${todayStr()}.xlsx`,d.h,d.r,'库存表',null,WH_DATE_COLS,{widths:WH_WIDTHS,rowHt:WH_ROW_HT},[8]); /* 第9列 SN码按文本写入；模板模式表头筛选箭头自动覆盖 B~M 全列（含「状态/领用人」） */
+  else if(REP_TAB==='耗材出库')exportXLSX(`耗材出库明细_${todayStr()}.xlsx`,d.h,d.r,'耗材出库',null,null,null,[9]); /* 第10列 SN码按文本写入：纯数字不以科学计数法显示 */
   else exportXLSX(`资产报表_${REP_TAB}_${todayStr()}.xlsx`,d.h,d.r,REP_TAB);
 }
 async function exportLedger(){
