@@ -13332,7 +13332,7 @@ function renderLedger(){
       <select id="f-cat" onchange="renderLedgerRows()"><option value="">全部分类</option>${catOpts(LED.cat)}</select>
       <span class="mut" style="margin-left:auto" id="led-total"></span>
       <button class="btn" onclick="gotoInbound()">＋ 新增资产（入库）</button>
-      <button class="btn ghost" onclick="exportLedger()">导出 CSV</button>
+      <button class="btn ghost" onclick="exportLedger()">📤 导出 Excel</button>
     </div>
     <div class="filterbar mt12" style="background:var(--pri-l);border:1px solid #c9dcf4;border-radius:10px">
       <b style="font-size:13px">分类查看：</b>
@@ -16161,7 +16161,7 @@ async function exportReport(){
 async function exportLedger(){
   await loadUserDir();
   const d={h:['编号','名称','产品编码','分类','状态','入库部门','使用科室','领用人','存放地点','金额'],r:DB.assets.slice().sort(ledgerDeptUserCmp).map(x=>[x.code,x.name,x.productCode||'',x.cat,stName(x.status),x.inDept,assetOwnerDept(x),x.user||'',x.location||'',x.amount])};
-  exportCSV(`资产台账_${todayStr()}.csv`,d.h,d.r);
+  exportXLSX(`资产台账_${todayStr()}.xlsx`,d.h,d.r,'资产台账',null,null,null,[0,2]); /* 改为 Excel 导出（与其他导出一致带表头下拉筛选）；编号/产品编码按文本写入，纯数字不以科学计数法显示、保留前导零 */
 }
 
 /* ================= 功能2：Excel 回填导出（以上传 Excel 的表头为模板，把库中资产信息按列自动填入后导出） ================= */
@@ -16334,7 +16334,7 @@ function exportXLSX(filename,headers,rows,sheetName,minW,dateCols,tpl,textCols){
        并开启“缩放到 1 页宽”（fitToPage）——签字等末列不会被分页挤到第二页（避免“沉底”） */
     const dim=`A1:${xlsxColName(nCol)}${rows.length+1}`;
     const sheetFmtPr=tpl?`<sheetFormatPr defaultColWidth="9" defaultRowHeight="${tpl.rowHt||15.6}"/>`:'<sheetFormatPr defaultColWidth="9" defaultRowHeight="14.25"/>';
-    const autoFilterXml=tpl?`<autoFilter ref="B1:${xlsxColName(nCol)}${rows.length+1}"/>`:''; // 模板模式：表头启用自动筛选（每列下拉箭头可点击选择）；范围从 B 列起（与模板 B1:AI4 一致，空 A 列不加箭头）
+    const autoFilterXml=`<autoFilter ref="${tpl?'B1':'A1'}:${xlsxColName(nCol)}${rows.length+1}"/>`; // 所有导出统一启用表头自动筛选（每列下拉箭头，WPS 显示为绿色筛选箭头）：模板模式从 B 列起（空 A 列不加箭头，与模板 B1:AI4 一致）；常规模式表头首列在 A1，从 A 列起覆盖全部列
     const sheetXml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="${dim}"/><sheetViews><sheetView workbookViewId="0"/></sheetViews>${sheetFmtPr}${colsXml}${sd}${autoFilterXml}<printOptions gridLines="1"/><pageMargins left="0.75" right="0.75" top="1" bottom="1" header="0.5" footer="0.5"/><pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="0"/></worksheet>`;
     const stylesXml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="164" formatCode="yyyy/m/d;@"/></numFmts><fonts count="5"><font><sz val="12"/><name val="宋体"/><charset val="134"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="等线"/><charset val="134"/></font><font><sz val="11"/><name val="等线"/><charset val="134"/></font><font><sz val="11"/><color rgb="FFFF0000"/><name val="宋体"/><charset val="134"/></font><font><sz val="11"/><name val="宋体"/><charset val="134"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF4A7EC7"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="7"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment vertical="center"/></xf><xf numFmtId="14" fontId="2" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1" applyAlignment="1"><alignment vertical="center"/></xf><xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="4" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1"/></cellXfs><cellStyles count="1"><cellStyle name="常规" xfId="0" builtinId="0"/></cellStyles></styleSheet>`;
     const wbXml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="${xmlEsc(SN)}" sheetId="1" r:id="rId1"/></sheets></workbook>`;
