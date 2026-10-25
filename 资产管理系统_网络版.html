@@ -14031,6 +14031,7 @@ function renderPOQuery(){
       <select id="poq-cat" onchange="POQ.cat=this.value;renderPOQueryRows()" style="min-width:110px"><option value="">全部物资类别</option>${DB.cats.map(c=>`<option value="${esc(c[0])}" ${POQ.cat===c[0]?'selected':''}>${esc(c[0])}</option>`).join('')}</select>
       <input id="poq-name" placeholder="物资名称（模糊）" value="${esc(POQ.name)}" oninput="POQ.name=this.value;renderPOQueryRows()" style="min-width:130px">
       <button class="btn sm ghost" onclick="POQ={no:'',dateFrom:'',dateTo:'',cat:'',name:''};renderPOQuery()">重置</button>
+      <button class="btn sm" style="margin-left:auto" onclick="exportPOQuery()" title="按当前查询条件导出 Excel">📤 导出 Excel</button>
     </div>
     <div class="tbl-wrap mt12" style="max-height:520px;overflow:auto">
       <table class="tbl"><thead><tr><th>订单编号</th><th>订单日期</th><th>物资类别</th><th>物资名称</th><th>规格</th><th>单位</th><th class="num">单价</th><th class="num">计划下单</th><th class="num">实际下单</th><th>供应商</th><th>计划到货日期</th><th>订单录入</th><th>状态</th></tr></thead>
@@ -14042,6 +14043,12 @@ function renderPOQuery(){
 }
 function renderPOQueryRows(){
   const tb=$('#poq-body');if(!tb)return;
+  const rows=poQueryRows();
+  tb.innerHTML=rows.length?rows.map(r=>`<tr>${r.map((c,i)=>`<td class="${i===6||i===7||i===8?'num':''}">${typeof c==='string'?esc(c):c}</td>`).join('')}</tr>`).join(''):'<tr><td colspan="13"><div class="empty">没有符合条件的订单记录</div></td></tr>';
+  const n=$('#poq-count');if(n)n.textContent=rows.length;
+}
+/* 查询行数据（渲染与导出共用同一逻辑，保证所见即所得） */
+function poQueryRows(){
   const rows=[];
   pos().forEach(p=>{
     if(POQ.no&&p.no!==POQ.no.trim())return;
@@ -14053,8 +14060,15 @@ function renderPOQueryRows(){
       rows.push([p.no,p.date,it.cat,it.name,it.spec,it.unit,it.price,it.planQty,it.actualQty,it.supplier,it.expectDate,p.enterBy,poStatBadge(p.status)]);
     });
   });
-  tb.innerHTML=rows.length?rows.map(r=>`<tr>${r.map((c,i)=>`<td class="${i===6||i===7||i===8?'num':''}">${typeof c==='string'?esc(c):c}</td>`).join('')}</tr>`).join(''):'<tr><td colspan="13"><div class="empty">没有符合条件的订单记录</div></td></tr>';
-  const n=$('#poq-count');if(n)n.textContent=rows.length;
+  return rows;
+}
+/* 导出当前查询结果为 Excel（状态徽章转纯文本） */
+function exportPOQuery(){
+  const rows=poQueryRows().map(r=>r.map(c=>String(c).replace(/<[^>]+>/g,''))); /* 去除状态徽章 HTML 标签 */
+  if(!rows.length)return toast('当前查询条件下没有可导出的记录','err');
+  const h=['订单编号','订单日期','物资类别','物资名称','规格','单位','单价','计划下单','实际下单','供应商','计划到货日期','订单录入','状态'];
+  exportXLSX(`采购订单查询_${todayStr()}.xlsx`,h,rows,'采购订单查询',null,null,null,null);
+  toast(`已导出当前查询结果：${rows.length} 行（采购订单查询_日期.xlsx）`);
 }
 /* ===== 页面3：订单入库（订单号带出已提交订单 → 到货日期 / 实收数量 / 收货人） ===== */
 let PI={no:''}; /* 入库会话：选中订单号（行数据从订单实时读取，录入值存 poIn 输入） */
