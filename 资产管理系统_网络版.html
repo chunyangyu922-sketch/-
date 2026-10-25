@@ -304,6 +304,7 @@ table.tbl{width:100%;border-collapse:collapse;font-size:13px;min-width:640px}
       <section class="view" id="view-outbound"></section>
       <section class="view" id="view-transfer"></section>
       <section class="view" id="view-consume"></section>
+      <section class="view" id="view-scrap"></section>
       <section class="view" id="view-stock"></section>
       <section class="view" id="view-report"></section>
       <section class="view" id="view-settings"></section>
@@ -12891,12 +12892,13 @@ const NAV=[
   {k:'inbound',ic:'📥',t:'入库登记',sub:'采购到货 → 入库登记 · 入库部门必填',g:'资产'},
   {k:'outbound',ic:'📤',t:'出库发放',sub:'领用申请 → 审批 → 发放并生成二维码',g:'流转'},
   {k:'transfer',ic:'🔁',t:'转移与退回',sub:'部门转移 · 离职退回 · 二维码更新/回收',g:'流转',admin:true},
-  {k:'consume',ic:'🧾',t:'出库耗材',sub:'闲置资产出库消耗 · 移出台账 · 记录可查可导出',g:'流转',admin:true},
+  {k:'consume',ic:'🧾',t:'出库耗材',sub:'闲置耗材资产出库消耗 · 移出台账 · 记录可查可导出',g:'流转',admin:true},
+  {k:'scrap',ic:'🗑️',t:'资产报废',sub:'固定资产报废处置 · 移出台账 · 记录可查可导出',g:'流转',admin:true},
   {k:'stock',ic:'🔍',t:'盘点管理',sub:'盘点计划 → 扫码执行 → 差异核对',g:'流转'},
   {k:'report',ic:'📑',t:'报表中心',sub:'台账 / 出入库 / 盘点 / 部门汇总',g:'工具'},
   {k:'settings',ic:'⚙️',t:'系统设置',sub:'部门 / 分类 / 数据备份与重置'}
 ];
-const renderers={dash:renderDash,ledger:renderLedger,inbound:renderInbound,outbound:renderOutbound,transfer:renderTransfer,consume:renderConsume,stock:renderStock,report:renderReport,settings:renderSettings};
+const renderers={dash:renderDash,ledger:renderLedger,inbound:renderInbound,outbound:renderOutbound,transfer:renderTransfer,consume:renderConsume,scrap:renderScrap,stock:renderStock,report:renderReport,settings:renderSettings};
 let CUR='dashboard';
 /* ===== 多标签页（浏览器式）：每个页面一个标签，可同时打开多个页面操作 =====
    切换标签不重渲染 —— 已填写的表单、筛选条件、勾选与滚动位置原样保留；
@@ -13164,7 +13166,7 @@ function ledgerRowHtml(x){
     <td style="width:34px"><input type="checkbox" data-bcb="${x.id}" ${LED.sel.includes(x.id)?'checked':''}></td>
     <td><b>${esc(x.code)}</b><br><span class="mut">${esc(x.cat)}</span></td>
     ${CUR_ORG==='ALL'?`<td>${esc(x._org||'')}</td>`:''}
-    <td><b>${esc(x.name)}</b><br><span class="mut">${esc(x.spec||'')}</span></td>
+    <td><b>${esc(x.name)}</b>${x.consumable?' <span class="tag" title="耗材资产：可在出库耗材页面出库" style="background:#fdefe8;color:#eb6834">耗材</span>':''}<br><span class="mut">${esc(x.spec||'')}</span></td>
     <td class="mut">${esc(x.productCode||'—')}</td>
     <td>${stBadge(x.status)}</td>
     <td>${esc(x.inDept||'—')}</td>
@@ -13518,7 +13520,7 @@ function renderConsume(){
   $('#view-consume').innerHTML=`
   <div class="grid g2">
     <div class="card">
-      <h3>① 选择出库资产 <span class="hint">仅闲置资产可出库耗材（在用须先退回）</span></h3>
+      <h3>① 选择出库资产 <span class="hint">仅标记为耗材的闲置资产可出库（入库时勾选「耗材」或台账编辑设置）</span></h3>
       <div class="filterbar" style="background:var(--pri-l);border:1px solid #c9dcf4;border-radius:10px">
         <input type="text" id="cs-q" placeholder="搜索（编号 / 名称 / 分类 / 存放地点…）" value="${esc(CS.q)}" oninput="CS.q=this.value;renderConsumeRows()" style="min-width:150px;flex:1">
         <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer"><input type="checkbox" id="cs-g-name" ${CS.group==='name'?'checked':''} onchange="setConsumeGroup('name')">按名称</label>
@@ -13569,10 +13571,14 @@ function consumeRecordsRows(){
   if(!list.length)return '<tr><td colspan="9"><div class="empty">暂无出库记录</div></td></tr>';
   return list.map(r=>`<tr><td><b>${esc(r.no)}</b></td><td>${esc(r.date)}</td><td>${esc(r.by)}</td><td>${esc(r.dept||'—')}</td><td>${esc(r.user||'—')}</td><td class="num">${(r.items||[]).length}</td><td class="mut">${esc(r.purpose||'—')}</td><td class="mut" style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(r.detail)}">${esc(r.detail)}</td><td class="act">${r.status==='已撤回'?'<span class="mut">已撤回</span>':`<button class="btn sm" onclick="consumeRevoke('${r.id}')">撤回</button>`}</td></tr>`).join('');
 }
+/* 耗材页可选资产：闲置 且 标记为耗材（入库登记「耗材」勾选 / 台账编辑可设） */
+function csIdleList(){
+  const k=(CS.q||'').trim().toLowerCase();
+  return DB.assets.filter(a=>a.status==='idle'&&a.consumable).filter(a=>!k||[a.code,a.name,a.cat,a.location].some(v=>String(v||'').toLowerCase().includes(k)));
+}
 function renderConsumeRows(){
   const tb=$('#cs-tbody');if(!tb)return;
-  const k=(CS.q||'').trim().toLowerCase();
-  const list=DB.assets.filter(a=>a.status==='idle').filter(a=>!k||[a.code,a.name,a.cat,a.location].some(v=>String(v||'').toLowerCase().includes(k)));
+  const list=csIdleList();
   tb.innerHTML=consumeRowsHtml(list)||'<tr><td colspan="7"><div class="empty">暂无闲置资产可出库</div></td></tr>';
   const t=$('#cs-total');if(t)t.textContent=list.length;
   ['name','cat','inDept','location'].forEach(v=>{const el=$('#cs-g-'+v);if(el)el.checked=CS.group===v});
@@ -13630,8 +13636,7 @@ function csGroupHead(gi){
   renderConsumeRows();
 }
 function csGroupItems(gi){
-  const k=(CS.q||'').trim().toLowerCase();
-  const list=DB.assets.filter(a=>a.status==='idle').filter(a=>!k||[a.code,a.name,a.cat,a.location].some(v=>String(v||'').toLowerCase().includes(k)));
+  const list=csIdleList();
   if(!CS.group)return list;
   const f=CS.group;
   const keyOf=a=>f==='name'?(a.name||'—'):f==='cat'?(a.cat||'—'):f==='inDept'?(a.inDept||'—'):(a.location||'—');
@@ -13653,7 +13658,7 @@ function consumeRevoke(rid){
   confirmDlg(`确定撤回出库单 <b>${esc(r.no)}</b>？<br><span style="color:var(--gray)">${items.length} 台资产将按原信息<b style="color:var(--good)">返回台账（闲置状态，编号不变）</b>：<br>${esc(codes)}<br>撤回后单据标记「已撤回」，此操作不可恢复。</span>`,()=>{
     /* 从快照重建资产：编号不变，恢复为闲置（无领用人） */
     items.forEach(it=>{
-      DB.assets.push({id:it.assetId||genId(),code:it.code||'',name:it.name||'',cat:it.cat||'',spec:it.spec||'',productCode:it.productCode||'',qty:it.qty||1,unit:it.unit||'台',amount:Number(it.amount)||0,inDept:it.inDept||'',location:it.location||'',status:'idle',user:'',userDept:'',receiveDate:'',history:[{t:nowStr(),act:'耗材撤回',desc:`耗材出库撤回：由出库单 ${r.no} 返回台账（闲置）`,by:DB.role}]});
+      DB.assets.push({id:it.assetId||genId(),code:it.code||'',name:it.name||'',cat:it.cat||'',spec:it.spec||'',productCode:it.productCode||'',qty:it.qty||1,unit:it.unit||'台',amount:Number(it.amount)||0,inDept:it.inDept||'',location:it.location||'',status:'idle',user:'',userDept:'',receiveDate:'',consumable:it.consumable!==false,history:[{t:nowStr(),act:'耗材撤回',desc:`耗材出库撤回：由出库单 ${r.no} 返回台账（闲置）`,by:DB.role}]});
     });
     r.status='已撤回';
     addRecord({no:nextDocNo('HCR'),type:'耗材撤回',date:todayStr(),by:DB.role,dept:r.dept||'',user:r.user||'',purpose:r.purpose||'',detail:`撤回出库单 ${r.no}：${items.length} 台资产返回台账（${codes}）`,status:'已完成'});
@@ -13685,7 +13690,7 @@ function doConsumeOut(){
   confirmDlg(`确定将 <b>${assets.length}</b> 台资产出库耗材（合计 ${fmtMoney(total)} 元）？<br><span style="color:var(--gray)">资产将<b style="color:#e5484d">从台账移除、不再追踪</b>（正常消耗，不重排编号）；出库记录保留，可在本页下方与 报表中心 → 耗材出库 查看导出。</span>`,()=>{
     const no=nextDocNo('HC');
     /* 明细快照：资产删除后记录仍完整可查（编号/名称/规格/SN/金额/部门等） */
-    const items=assets.map(a=>({assetId:a.id,code:a.code||'',name:a.name||'',cat:a.cat||'',spec:a.spec||'',productCode:a.productCode||'',qty:a.qty||1,unit:a.unit||'台',amount:Number(a.amount)||0,inDept:a.inDept||'',location:a.location||''}));
+    const items=assets.map(a=>({assetId:a.id,code:a.code||'',name:a.name||'',cat:a.cat||'',spec:a.spec||'',productCode:a.productCode||'',qty:a.qty||1,unit:a.unit||'台',amount:Number(a.amount)||0,inDept:a.inDept||'',location:a.location||'',consumable:true}));
     addRecord({no,type:'耗材出库',date:todayStr(),by:DB.role,dept,user,purpose,detail:`耗材出库 ${assets.length} 台（${assets.map(a=>a.code).join('、')}）`,status:'已完成',assetIds:assets.map(a=>a.id),items});
     /* 移出台账 + 清盘点引用；不重排编号（正常消耗：重排会使在库资产编号变化、已打印二维码失效） */
     const ids=new Set(assets.map(a=>a.id));
@@ -13696,6 +13701,173 @@ function doConsumeOut(){
     toast(`耗材出库完成：${assets.length} 台已移出台账（单号 ${no}，报表中心 → 耗材出库 可查）`);
     renderConsume();
   },'出库耗材',true);
+}
+
+/* ================= 资产报废（独立页面）：固定资产报废处置，移出台账；单据含明细快照（原状态/原领用人），报表中心可查可导出 ================= */
+let SC={ids:[],q:'',group:'',collapsed:{},reason:'',dispose:'',note:''}; /* 页面状态：勾选/搜索/分组/表单（切标签保留） */
+/* 报废页可选资产：非耗材固定资产（耗材走出库耗材），排除审批锁定中(pend)——闲置/在用/退回未进库均可报废 */
+function scIdleList(){
+  const k=(SC.q||'').trim().toLowerCase();
+  return DB.assets.filter(a=>a.status!=='pend'&&!a.consumable).filter(a=>!k||[a.code,a.name,a.cat,a.location,a.user].some(v=>String(v||'').toLowerCase().includes(k)));
+}
+function renderScrap(){
+  const isAdmin=ME.role==='admin';
+  if(!isAdmin){$('#view-scrap').innerHTML='<div class="card"><div class="empty">「资产报废」仅管理员可用</div></div>';return}
+  $('#view-scrap').innerHTML=`
+  <div class="grid g2">
+    <div class="card">
+      <h3>① 选择报废资产 <span class="hint">非耗材固定资产（耗材请走出库耗材）；闲置 / 在用 / 退回未进库均可报废</span></h3>
+      <div class="filterbar" style="background:var(--pri-l);border:1px solid #c9dcf4;border-radius:10px">
+        <input type="text" id="sc-q" placeholder="搜索（编号 / 名称 / 分类 / 存放地点 / 领用人…）" value="${esc(SC.q)}" oninput="SC.q=this.value;renderScrapRows()" style="min-width:150px;flex:1">
+        <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer"><input type="checkbox" id="sc-g-name" ${SC.group==='name'?'checked':''} onchange="setScrapGroup('name')">按名称</label>
+        <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer"><input type="checkbox" id="sc-g-cat" ${SC.group==='cat'?'checked':''} onchange="setScrapGroup('cat')">按分类</label>
+        <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer"><input type="checkbox" id="sc-g-inDept" ${SC.group==='inDept'?'checked':''} onchange="setScrapGroup('inDept')">按入库部门</label>
+        <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer"><input type="checkbox" id="sc-g-location" ${SC.group==='location'?'checked':''} onchange="setScrapGroup('location')">按存放地点</label>
+        <button class="btn sm ghost" onclick="SC.ids=[];renderScrapRows()">清空勾选</button>
+      </div>
+      <div class="mut" style="font-size:11.5px;margin:6px 0 0">点组头可整组勾选/取消；再点切换展开/收起</div>
+      <div class="tbl-wrap" style="max-height:300px;overflow:auto">
+        <table class="tbl"><thead><tr><th style="width:34px"></th><th>编号</th><th>名称</th><th>分类</th><th>状态</th><th>领用人</th><th>存放</th><th class="num">金额</th></tr></thead>
+        <tbody id="sc-tbody"></tbody></table>
+      </div>
+      <div class="btn-row mt12"><span class="mut">共 <b id="sc-total">0</b> 台可报废 · 已选 <b id="sc-count">0</b> 台 · 合计 <b id="sc-amount">0</b> 元</span></div>
+    </div>
+    <div class="card">
+      <h3>② 报废信息</h3>
+      <div class="mut" style="font-size:12.5px;margin-bottom:12px">报废后资产<b style="color:#e5484d">从台账移除、不再追踪</b>（不重排编号）；报废记录永久保留（含原领用人与状态），可在 报表中心 → 资产报废 查看与导出 Excel。报废为终局处置，<b>无撤回</b>（耗材误出库可在出库耗材页撤回）。</div>
+      <div class="form-grid" style="grid-template-columns:1fr">
+        <div class="fg"><label>报废原因 <span class="hint" style="font-size:11px">建议填写，便于审计追溯</span></label><input id="sc-reason" value="${esc(SC.reason)}" list="sc-reason-list" placeholder="如：设备老化无法维修 / 损坏报废 / 到期淘汰" oninput="SC.reason=this.value"><datalist id="sc-reason-list"><option value="设备老化无法维修"></option><option value="损坏无法修复"></option><option value="达到使用年限淘汰"></option><option value="技术落后升级换代"></option><option value="遗失核销"></option></datalist></div>
+        <div class="fg"><label>处置方式</label><input id="sc-dispose" value="${esc(SC.dispose)}" list="sc-dispose-list" placeholder="可输入或选择" oninput="SC.dispose=this.value"><datalist id="sc-dispose-list"><option value="废品出售"></option><option value="报废销毁"></option><option value="捐赠处置"></option><option value="无偿调拨"></option><option value="留作备件"></option></datalist></div>
+        <div class="fg"><label>备注</label><input id="sc-note" value="${esc(SC.note)}" placeholder="如：批准文号 / 残值收入（可留空）" oninput="SC.note=this.value"></div>
+      </div>
+      <div class="btn-row mt16">
+        <button class="btn danger" id="sc-go" onclick="doScrap()">确认资产报废（<span id="sc-go-n">0</span> 台）</button>
+        <span class="mut" style="font-size:12px">确认前会再次弹窗确认</span>
+      </div>
+    </div>
+  </div>
+  <div class="card" style="margin-top:16px">
+    <h3>③ 最近报废记录 <span class="hint">完整明细与导出请到 <a style="color:var(--pri);cursor:pointer;text-decoration:underline" onclick="REP_TAB='资产报废';switchView('report')">报表中心 → 资产报废</a></span></h3>
+    <div class="tbl-wrap" style="max-height:280px;overflow:auto">
+      <table class="tbl"><thead><tr><th>报废编号</th><th>日期</th><th>经办人</th><th>报废原因</th><th>处置方式</th><th class="num">台数</th><th>备注</th><th>明细</th></tr></thead>
+      <tbody id="sc-records">${scrapRecordsRows()}</tbody></table>
+    </div>
+  </div>`;
+  renderScrapRows();
+  const tb=$('#sc-tbody');
+  if(tb&&!tb.dataset.bound){tb.dataset.bound='1';tb.addEventListener('click',e=>{
+    const gh=e.target.closest('tr[data-gi]');
+    if(gh&&!e.target.matches('input[type=checkbox]')){scGroupHead(+gh.dataset.gi);return}
+  })}
+}
+function scrapRecordsRows(){
+  const list=DB.records.filter(r=>r.type==='资产报废').slice(0,15);
+  if(!list.length)return '<tr><td colspan="8"><div class="empty">暂无报废记录</div></td></tr>';
+  return list.map(r=>`<tr><td><b>${esc(r.no)}</b></td><td>${esc(r.date)}</td><td>${esc(r.by)}</td><td class="mut">${esc(r.reason||'—')}</td><td class="mut">${esc(r.dispose||'—')}</td><td class="num">${(r.items||[]).length}</td><td class="mut">${esc(r.note||'—')}</td><td class="mut" style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(r.detail)}">${esc(r.detail)}</td></tr>`).join('');
+}
+function renderScrapRows(){
+  const tb=$('#sc-tbody');if(!tb)return;
+  const list=scIdleList();
+  tb.innerHTML=scrapRowsHtml(list)||'<tr><td colspan="8"><div class="empty">暂无可报废资产</div></td></tr>';
+  const t=$('#sc-total');if(t)t.textContent=list.length;
+  ['name','cat','inDept','location'].forEach(v=>{const el=$('#sc-g-'+v);if(el)el.checked=SC.group===v});
+  updScrapStat();
+}
+/* 单行（含勾选状态与状态徽章） */
+function scRowHtml(a){
+  return `<tr data-aid="${esc(a.id)}" class="${SC.ids.includes(a.id)?'sel':''}"><td><input type="checkbox" data-scb="${esc(a.id)}" ${SC.ids.includes(a.id)?'checked':''} onchange="scToggle('${esc(a.id)}',this.checked,this)"></td><td><b>${esc(a.code)}</b></td><td>${esc(a.name)}</td><td>${esc(a.cat)}</td><td>${stBadge(a.status)}</td><td class="mut">${esc(a.user||'—')}</td><td class="mut">${esc(a.location||'—')}</td><td class="num">${fmtMoney(a.amount)}</td></tr>`;
+}
+/* 分组渲染（与耗材页同款：组头勾选框 + 统计） */
+function scrapRowsHtml(list){
+  if(!SC.group)return list.map(a=>scRowHtml(a)).join('');
+  const f=SC.group;
+  const keyOf=a=>f==='name'?(a.name||'—'):f==='cat'?(a.cat||'—'):f==='inDept'?(a.inDept||'—'):(a.location||'—');
+  const map=new Map();
+  list.forEach(a=>{const g=keyOf(a);if(!map.has(g))map.set(g,[]);map.get(g).push(a)});
+  const keys=[...map.keys()].sort((a,b)=>String(a).localeCompare(String(b),'zh'));
+  let html='',gi=0;
+  keys.forEach(g=>{
+    const items=map.get(g);
+    const col=!!SC.collapsed[gi];
+    const sum=items.reduce((s,a)=>s+(Number(a.amount)||0),0);
+    const selCnt=items.filter(a=>SC.ids.includes(a.id)).length;
+    const allSel=selCnt===items.length&&items.length>0;
+    html+=`<tr data-gi="${gi}" style="cursor:pointer;background:#f4f8fd"><td style="text-align:center"><input type="checkbox" data-scsg="${gi}" ${allSel?'checked':''} onclick="event.stopPropagation();scGroupToggle(${gi},this.checked)"></td><td colspan="7" style="padding:8px 10px"><span style="display:inline-block;width:13px;color:#4a7ec7">${col?'▶':'▼'}</span> <b>${esc(g)}</b> <span class="mut">· ${items.length} 台 · ${fmtMoney(sum)}${selCnt?` · 已选 ${selCnt}`:''}</span></td></tr>`;
+    if(!col)html+=items.map(a=>scRowHtml(a)).join('');
+    gi++;
+  });
+  return html;
+}
+function scToggle(id,ck,el){
+  const i=SC.ids.indexOf(id);
+  if(ck&&i<0)SC.ids.push(id);
+  if(!ck&&i>=0)SC.ids.splice(i,1);
+  if(el&&el.closest)el.closest('tr').classList.toggle('sel',ck);
+  updScrapStat();
+}
+function updScrapStat(){
+  const assets=SC.ids.map(id=>assetById(id)).filter(Boolean);
+  const c=$('#sc-count'),m=$('#sc-amount'),g=$('#sc-go-n');
+  if(c)c.textContent=assets.length;
+  if(m)m.textContent=fmtMoney(assets.reduce((t,a)=>t+(Number(a.amount)||0),0));
+  if(g)g.textContent=assets.length;
+}
+function scGroupItems(gi){
+  const list=scIdleList();
+  if(!SC.group)return list;
+  const f=SC.group;
+  const keyOf=a=>f==='name'?(a.name||'—'):f==='cat'?(a.cat||'—'):f==='inDept'?(a.inDept||'—'):(a.location||'—');
+  const map=new Map();
+  list.forEach(a=>{const g=keyOf(a);if(!map.has(g))map.set(g,[]);map.get(g).push(a)});
+  const keys=[...map.keys()].sort((a,b)=>String(a).localeCompare(String(b),'zh'));
+  return map.get(keys[gi])||[];
+}
+function scGroupToggle(gi,on){
+  scGroupItems(gi).forEach(a=>{
+    const i=SC.ids.indexOf(a.id);
+    if(on&&i<0)SC.ids.push(a.id);
+    if(!on&&i>=0)SC.ids.splice(i,1);
+  });
+  renderScrapRows();
+}
+/* 组头行点击：未全选→全选整组；全选且展开→收起；收起再点→取消整组并展开 */
+function scGroupHead(gi){
+  const list=scGroupItems(gi);
+  if(!list.length)return;
+  const selCnt=list.filter(a=>SC.ids.includes(a.id)).length;
+  const allSel=selCnt===list.length;
+  if(!allSel){
+    list.forEach(a=>{if(!SC.ids.includes(a.id))SC.ids.push(a.id)});
+  }else if(SC.collapsed[gi]!==true){
+    SC.collapsed[gi]=true;
+  }else{
+    SC.collapsed[gi]=false;
+    list.forEach(a=>{const i=SC.ids.indexOf(a.id);if(i>=0)SC.ids.splice(i,1)});
+  }
+  renderScrapRows();
+}
+function setScrapGroup(v){SC.group=SC.group===v?'':v;SC.collapsed={};renderScrapRows()}
+function doScrap(){
+  if(!approveOnly())return;
+  const assets=SC.ids.map(id=>assetById(id)).filter(Boolean).filter(a=>a.status!=='pend'&&!a.consumable);
+  if(!assets.length)return toast('请先在左侧勾选要报废的资产（非耗材固定资产）','err');
+  const reason=$('#sc-reason')?$('#sc-reason').value.trim():'',dispose=$('#sc-dispose')?$('#sc-dispose').value.trim():'',note=$('#sc-note')?$('#sc-note').value.trim():'';
+  const total=assets.reduce((t,a)=>t+(Number(a.amount)||0),0);
+  const inuseCnt=assets.filter(a=>a.status==='inuse').length;
+  confirmDlg(`确定将 <b>${assets.length}</b> 台资产报废（合计原值 ${fmtMoney(total)} 元）？<br><span style="color:var(--gray)">${inuseCnt?`其中 <b style="color:var(--warn-d)">${inuseCnt} 台为在用资产</b>（${esc(assets.filter(a=>a.status==='inuse').map(a=>a.code).join('、'))}）<br>`:''}资产将<b style="color:#e5484d">从台账移除、不再追踪</b>（不重排编号）；报废记录保留（含原领用人/状态），可在 报表中心 → 资产报废 查看导出。<b>报废为终局处置，无撤回。</b></span>`,()=>{
+    const no=nextDocNo('BF');
+    /* 明细快照：资产删除后记录仍完整可查（含原状态/原领用人/原部门） */
+    const items=assets.map(a=>({assetId:a.id,code:a.code||'',name:a.name||'',cat:a.cat||'',spec:a.spec||'',productCode:a.productCode||'',qty:a.qty||1,unit:a.unit||'台',amount:Number(a.amount)||0,inDept:a.inDept||'',location:a.location||'',origStatus:stName(a.status),origUser:a.user||'',origUserDept:a.userDept||''}));
+    addRecord({no,type:'资产报废',date:todayStr(),by:DB.role,reason,dispose,note,detail:`资产报废 ${assets.length} 台（${assets.map(a=>a.code).join('、')}）${reason?'：'+reason:''}`,status:'已完成',assetIds:assets.map(a=>a.id),items});
+    /* 移出台账 + 清盘点引用；不重排编号（报废为终局处置：重排会使在库编号变化、已打印二维码失效） */
+    const ids=new Set(assets.map(a=>a.id));
+    DB.assets=DB.assets.filter(a=>!ids.has(a.id));
+    DB.stocktakes.forEach(st=>st.items=st.items.filter(i=>!ids.has(i.assetId)));
+    save();
+    SC.ids=[];SC.reason=''; /* 清勾选与原因；处置方式/备注保留便于连续报废 */
+    toast(`资产报废完成：${assets.length} 台已移出台账（单号 ${no}，报表中心 → 资产报废 可查）`);
+    renderScrap();
+  },'资产报废',true);
 }
 /* ===== 删除后编号自动重排：剩余资产按原编号顺序从 PRL+年份+0001 重新连续编号 ===== */
 function renumberAssets(){
@@ -13867,6 +14039,7 @@ async function editAsset(id){
     <div class="fg"><label>SN码（产品编码）</label><input id="ed-pc" value="${esc(x.productCode||'')}"></div>
     <div class="fg"><label>领用人 <span class="hint">可直接输入任意姓名，非注册用户也可</span></label><input id="ed-user" value="${esc(x.user||'')}" list="ed-user-list" placeholder="留空 = 无人领用">${USER_DIR.length?`<datalist id="ed-user-list">${USER_DIR.map(n=>`<option value="${esc(n)}">`).join('')}</datalist>`:''}</div>
     <div class="fg"><label>领用部门</label><input id="ed-userDept" value="${esc(x.userDept||'')}" list="ed-dept-list" placeholder="可输入或选择"><datalist id="ed-dept-list">${DB.depts.map(d=>`<option value="${esc(d)}">`).join('')}</datalist></div>
+    <div class="fg" style="align-self:end"><label style="display:flex;align-items:center;gap:7px;cursor:pointer;padding:9px 0"><input type="checkbox" id="ed-consumable" ${x.consumable?'checked':''} style="width:16px;height:16px"> <span>耗材资产 <span class="hint" style="font-size:11px">仅耗材可在「出库耗材」页出库</span></span></label></div>
     </div>
     ${H4('② 厂商与日期')}
     <div class="form-grid">
@@ -13955,6 +14128,12 @@ function saveEdit(id){
   }else if(eud!==oldDept&&(eu||eud)){
     x.userDept=eud;x.useDept=eud;
     if(eu)addHistory(x,'台账领用',`台账直接编辑领用部门：「${oldDept||'—'}」 → 「${eud||'—'}」`);
+  }
+  /* 耗材标记：勾选后仅可在「出库耗材」页面出库消耗；变更记入履历 */
+  const eCons=$('#ed-consumable')?!!$('#ed-consumable').checked:!!x.consumable;
+  if(eCons!==!!x.consumable){
+    x.consumable=eCons;
+    addHistory(x,'资料修改',`台账标记变更：${eCons?'设为耗材资产（出库耗材页面可出库）':'取消耗材标记（恢复普通固定资产）'}`);
   }
   /* 资产卡片字段（对齐导入模板）：未填/非法输入回落默认值 */
   const fd=faDefaults();
@@ -14268,6 +14447,7 @@ function renderInbound(){
     <td><input type="number" min="0" value="${r.amount}" style="width:90px" oninput="INB.rows[${i}].amount=+this.value;updRowTotal(${i})" placeholder="单价"></td>
     <td><input type="number" min="1" value="${r.qty}" style="width:64px" oninput="INB.rows[${i}].qty=+this.value;updRowTotal(${i})"></td>
     <td class="num" id="row-total-${i}" style="width:100px;font-weight:600">${fmtMoney(((Number(r.amount)||0)*(Number(r.qty)||0)))}</td>
+    <td style="width:56px;text-align:center" title="勾选后该资产标记为耗材：仅耗材资产可在「出库耗材」页面出库消耗；不勾选则为普通固定资产，报废走「资产报废」"><input type="checkbox" ${r.consumable?'checked':''} onchange="INB.rows[${i}].consumable=this.checked"></td>
     <td class="act"><button class="btn sm danger" onclick="INB.rows.splice(${i},1);renderInbound()">删</button></td></tr>`).join('');
   $('#view-inbound').innerHTML=`
   <div class="card">
@@ -14287,7 +14467,7 @@ function renderInbound(){
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="btn sm pri" onclick="addInboundRow()">＋ 手动加行</button><button class="btn sm" onclick="scanInboundRow(-1)">📷 拍照识别自动加行</button><button class="btn sm" onclick="importExcelInbound()">📥 Excel 批量导入</button>    <span class="mut" style="font-size:12px">拍设备标签照片（二维码/条形码均可），自动提取 SN 序列号填入产品编码；也可逐行手动填写。产品编码为设备唯一 SN，重复会被拦截。Excel 批量导入支持 35 列资产导入模板及常用简化表头，导入前可预览校验</span></div>
     <div class="tbl-wrap mt12" ${INB.rows.length?'':'style="display:none"'} id="in-tbl">
       <table class="tbl">
-        <thead><tr><th>名称</th><th>分类</th><th>规格</th><th style="width:172px">产品编码</th><th style="width:60px">单位</th><th style="width:90px">单价</th><th style="width:70px">数量</th><th style="width:100px">总金额</th><th></th></tr></thead>
+        <thead><tr><th>名称</th><th>分类</th><th>规格</th><th style="width:172px">产品编码</th><th style="width:60px">单位</th><th style="width:90px">单价</th><th style="width:70px">数量</th><th style="width:100px">总金额</th><th title="勾选=耗材资产：可在「出库耗材」页面出库消耗；不勾=普通资产：报废走「资产报废」" style="width:56px">耗材</th><th></th></tr></thead>
         <tbody>${rowsHtml}</tbody>
       </table>
     </div>
@@ -14301,7 +14481,7 @@ function renderInbound(){
   loadUserDir();
 }
 function addInboundRow(){
-  INB.rows.push({id:genId(),name:'',cat:DB.cats[0][0],spec:'',qty:1,unit:'台',amount:0,productCode:''});
+  INB.rows.push({id:genId(),name:'',cat:DB.cats[0][0],spec:'',qty:1,unit:'台',amount:0,productCode:'',consumable:false});
   renderInbound();
 }
 function updRowTotal(i){
@@ -14499,8 +14679,8 @@ function submitInbound(){
     // 一物一码：按数量拆分为多台独立资产，每台生成独立编号与履历
     const cap=qty>200?200:qty; // 单行上限保护
     for(let k=1;k<=cap;k++){
-      const x={id:genId(),code:nextAssetNo(r.cat),name:r.name.trim(),cat:r.cat,spec:r.spec.trim(),qty:1,unit:r.unit.trim()||'台',amount:Number(r.amount)||0,productCode:r.productCode,inDept:dept,manager,useDept:'',location:loc,status:'idle',user:'',userDept:'',receiveDate:'',inDate,inType,inNo,invoiceNo:inv,remark:cap>1?`批量入库第 ${k}/${cap} 台`:'' ,history:[],useStatus:'运行中',faStatus:'运行中',depAcc:0,mfgDate:'',installDate:'',brand:'',manageDept:'',depYears:5,depTimes:60,depDone:0,supplier:'',acquire:inTypeToAcquire(inType)||'购入',ownership:'自有',useDir:'自用',depMethod:'平均年限法',depConv:'次月',maker:'',company:(CUR_ORG&&CUR_ORG!=='ALL')?orgName(CUR_ORG):'',allocs:[]};
-      addHistory(x,'入库登记',`入库部门：${dept}；入库人：${manager}；入库编号 ${inNo}${r.productCode?`；保存产品编码 ${r.productCode}`:'；无产品码，系统生成内部编号'}${cap>1?`；同批共 ${cap} 台，本台为第 ${k} 台`:''}`);
+      const x={id:genId(),code:nextAssetNo(r.cat),name:r.name.trim(),cat:r.cat,spec:r.spec.trim(),qty:1,unit:r.unit.trim()||'台',amount:Number(r.amount)||0,productCode:r.productCode,inDept:dept,manager,useDept:'',location:loc,status:'idle',user:'',userDept:'',receiveDate:'',inDate,inType,inNo,invoiceNo:inv,remark:cap>1?`批量入库第 ${k}/${cap} 台`:'' ,history:[],consumable:!!r.consumable,useStatus:'运行中',faStatus:'运行中',depAcc:0,mfgDate:'',installDate:'',brand:'',manageDept:'',depYears:5,depTimes:60,depDone:0,supplier:'',acquire:inTypeToAcquire(inType)||'购入',ownership:'自有',useDir:'自用',depMethod:'平均年限法',depConv:'次月',maker:'',company:(CUR_ORG&&CUR_ORG!=='ALL')?orgName(CUR_ORG):'',allocs:[]};
+      addHistory(x,'入库登记',`入库部门：${dept}；入库人：${manager}；入库编号 ${inNo}${r.productCode?`；保存产品编码 ${r.productCode}`:'；无产品码，系统生成内部编号'}${cap>1?`；同批共 ${cap} 台，本台为第 ${k} 台`:''}${r.consumable?'；标记为耗材':''}`);
       DB.assets.push(x);made++;
     }
   });
@@ -15605,7 +15785,7 @@ function ledgerDeptUserCmp(a,b){
 }
 let REP_TAB='台账';
 function renderReport(){
-  const tabs=[['台账','台账'],['入库','入库明细'],['出库','出库发放'],['转移退回','转移与退回'],['耗材出库','耗材出库'],['盘点差异','盘点差异'],['资产卡片','资产卡片'],['库存表','库存表'],['部门汇总','部门汇总'],['Excel回填','Excel回填']].map(([k,t])=>`<button class="${REP_TAB===k?'on':''}" onclick="REP_TAB='${k}';renderReport()">${t}</button>`).join('');
+  const tabs=[['台账','台账'],['入库','入库明细'],['出库','出库发放'],['转移退回','转移与退回'],['耗材出库','耗材出库'],['资产报废','资产报废'],['盘点差异','盘点差异'],['资产卡片','资产卡片'],['库存表','库存表'],['部门汇总','部门汇总'],['Excel回填','Excel回填']].map(([k,t])=>`<button class="${REP_TAB===k?'on':''}" onclick="REP_TAB='${k}';renderReport()">${t}</button>`).join('');
   $('#view-report').innerHTML=`<div class="card">
     <div class="filterbar">
       <div class="qrtabs">${tabs}</div>
@@ -15639,6 +15819,13 @@ function reportData(){
     DB.records.filter(r=>r.type==='耗材出库').forEach(r=>{
       (r.items&&r.items.length?r.items:[{code:'',name:'',cat:'',spec:'',productCode:'',qty:'',unit:'',amount:'',inDept:'',location:''}]).forEach(it=>{
         d.r.push([r.no,r.date,r.by,r.dept||'—',r.user||'—',it.code,it.name,it.cat,it.spec,it.productCode,it.qty?it.qty+it.unit:'',it.amount||0,it.location,r.purpose||'']);
+      });
+    });
+  }else if(REP_TAB==='资产报废'){
+    d.h=['报废编号','日期','经办人','报废原因','处置方式','资产编号','资产名称','分类','规格','SN码','数量','原值(元)','原状态','原领用人','原存放地点','备注'];
+    DB.records.filter(r=>r.type==='资产报废').forEach(r=>{
+      (r.items&&r.items.length?r.items:[{code:'',name:'',cat:'',spec:'',productCode:'',qty:'',unit:'',amount:'',origStatus:'',origUser:'',location:'',}]).forEach(it=>{
+        d.r.push([r.no,r.date,r.by,r.reason||'—',r.dispose||'—',it.code,it.name,it.cat,it.spec,it.productCode,it.qty?it.qty+it.unit:'',it.amount||0,it.origStatus||'—',it.origUser||'—',it.location,r.note||'']);
       });
     });
   }else if(REP_TAB==='盘点差异'){
@@ -15685,6 +15872,7 @@ async function exportReport(){
   if(REP_TAB==='资产卡片')exportXLSX(`资产卡片_${todayStr()}.xlsx`,d.h,d.r,'资产卡片',null,FA_DATE_COLS,{widths:FA_WIDTHS,rowHt:FA_ROW_HT,dataFontSz:FA_DATA_FONT_SZ},[14]); /* 第15列 SN码按文本写入：纯数字不以科学计数法显示（如 25010023974） */
   else if(REP_TAB==='库存表')exportXLSX(`库存表_${todayStr()}.xlsx`,d.h,d.r,'库存表',null,WH_DATE_COLS,{widths:WH_WIDTHS,rowHt:WH_ROW_HT},[8]); /* 第9列 SN码按文本写入；模板模式表头筛选箭头自动覆盖 B~M 全列（含「状态/领用人」） */
   else if(REP_TAB==='耗材出库')exportXLSX(`耗材出库明细_${todayStr()}.xlsx`,d.h,d.r,'耗材出库',null,null,null,[9]); /* 第10列 SN码按文本写入：纯数字不以科学计数法显示 */
+  else if(REP_TAB==='资产报废')exportXLSX(`资产报废明细_${todayStr()}.xlsx`,d.h,d.r,'资产报废',null,null,null,[9]); /* 第10列 SN码按文本写入：纯数字不以科学计数法显示 */
   else exportXLSX(`资产报表_${REP_TAB}_${todayStr()}.xlsx`,d.h,d.r,REP_TAB);
 }
 async function exportLedger(){
