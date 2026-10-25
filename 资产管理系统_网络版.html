@@ -13509,8 +13509,8 @@ function batchSubmitTransfer(){
   toast(skip?`完成 ${made} 台，${skip} 台领用人未变已跳过`:`批量转移完成 ${made} 台`);
   renderLedger();
 }
-/* ===== 出库耗材（独立页面）：闲置资产出库消耗，移出台账不再追踪；单据含明细快照，报表中心可查可导出 ===== */
-let CS={ids:[],q:'',dept:'',user:'',purpose:''}; /* 页面状态：勾选/搜索/表单（切标签保留，与 OUT 一致） */
+/* ===== 出库耗材（独立页面）：闲置资产出库消耗，移出台账不再追踪；单据含明细快照，报表中心可查可导出；支持分组批量勾选与撤回 ===== */
+let CS={ids:[],q:'',dept:'',user:'',purpose:'',group:'',collapsed:{}}; /* 页面状态：勾选/搜索/表单/分组（切标签保留，与 OUT 一致） */
 function renderConsume(){
   const isAdmin=ME.role==='admin';
   if(!isAdmin){$('#view-consume').innerHTML='<div class="card"><div class="empty">「出库耗材」仅管理员可用</div></div>';return}
@@ -13521,8 +13521,13 @@ function renderConsume(){
       <h3>① 选择出库资产 <span class="hint">仅闲置资产可出库耗材（在用须先退回）</span></h3>
       <div class="filterbar" style="background:var(--pri-l);border:1px solid #c9dcf4;border-radius:10px">
         <input type="text" id="cs-q" placeholder="搜索（编号 / 名称 / 分类 / 存放地点…）" value="${esc(CS.q)}" oninput="CS.q=this.value;renderConsumeRows()" style="min-width:150px;flex:1">
-        <button class="btn sm ghost" onclick="CS.ids=[];renderConsumeRows();updConsumeStat()">清空勾选</button>
+        <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer"><input type="checkbox" id="cs-g-name" ${CS.group==='name'?'checked':''} onchange="setConsumeGroup('name')">按名称</label>
+        <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer"><input type="checkbox" id="cs-g-cat" ${CS.group==='cat'?'checked':''} onchange="setConsumeGroup('cat')">按分类</label>
+        <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer"><input type="checkbox" id="cs-g-inDept" ${CS.group==='inDept'?'checked':''} onchange="setConsumeGroup('inDept')">按入库部门</label>
+        <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer"><input type="checkbox" id="cs-g-location" ${CS.group==='location'?'checked':''} onchange="setConsumeGroup('location')">按存放地点</label>
+        <button class="btn sm ghost" onclick="CS.ids=[];renderConsumeRows()">清空勾选</button>
       </div>
+      <div class="mut" style="font-size:11.5px;margin:6px 0 0">点组头可整组勾选/取消；再点切换展开/收起</div>
       <div class="tbl-wrap" style="max-height:300px;overflow:auto">
         <table class="tbl"><thead><tr><th style="width:34px"></th><th>编号</th><th>名称</th><th>分类</th><th>单位</th><th>存放</th><th class="num">金额</th></tr></thead>
         <tbody id="cs-tbody"></tbody></table>
@@ -13544,27 +13549,118 @@ function renderConsume(){
     </div>
   </div>
   <div class="card" style="margin-top:16px">
-    <h3>③ 最近出库记录 <span class="hint">完整明细与导出请到 <a style="color:var(--pri);cursor:pointer;text-decoration:underline" onclick="REP_TAB='耗材出库';switchView('report')">报表中心 → 耗材出库</a></span></h3>
+    <h3>③ 出库记录 <span class="hint">完整明细与导出请到 <a style="color:var(--pri);cursor:pointer;text-decoration:underline" onclick="REP_TAB='耗材出库';switchView('report')">报表中心 → 耗材出库</a></span></h3>
     <div class="tbl-wrap" style="max-height:280px;overflow:auto">
-      <table class="tbl"><thead><tr><th>出库编号</th><th>日期</th><th>经办人</th><th>领用部门</th><th>使用人</th><th class="num">台数</th><th>用途</th><th>明细</th></tr></thead>
+      <table class="tbl"><thead><tr><th>出库编号</th><th>日期</th><th>经办人</th><th>领用部门</th><th>使用人</th><th class="num">台数</th><th>用途</th><th>明细</th><th class="act">操作</th></tr></thead>
       <tbody id="cs-records">${consumeRecordsRows()}</tbody></table>
     </div>
+    <div class="mut" style="font-size:11.5px;margin-top:8px">撤回仅限近期误出库的单据；被撤回的资产按原编号返回台账闲置状态，撤回后不可恢复出库前状态。</div>
   </div>`;
   renderConsumeRows();
+  const tb=$('#cs-tbody');
+  if(tb&&!tb.dataset.bound){tb.dataset.bound='1';tb.addEventListener('click',e=>{
+    const gh=e.target.closest('tr[data-gi]');
+    if(gh&&!e.target.matches('input[type=checkbox]')){csGroupHead(+gh.dataset.gi);return} /* 组头文字点击：整组勾选/收展 */
+  })}
   loadUserDir().then(()=>{const dl=document.getElementById('cs-user-list');if(USER_DIR.length&&!dl)renderConsume()});
 }
 function consumeRecordsRows(){
   const list=DB.records.filter(r=>r.type==='耗材出库').slice(0,15);
-  if(!list.length)return '<tr><td colspan="8"><div class="empty">暂无出库记录</div></td></tr>';
-  return list.map(r=>`<tr><td><b>${esc(r.no)}</b></td><td>${esc(r.date)}</td><td>${esc(r.by)}</td><td>${esc(r.dept||'—')}</td><td>${esc(r.user||'—')}</td><td class="num">${(r.items||[]).length}</td><td class="mut">${esc(r.purpose||'—')}</td><td class="mut" style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(r.detail)}">${esc(r.detail)}</td></tr>`).join('');
+  if(!list.length)return '<tr><td colspan="9"><div class="empty">暂无出库记录</div></td></tr>';
+  return list.map(r=>`<tr><td><b>${esc(r.no)}</b></td><td>${esc(r.date)}</td><td>${esc(r.by)}</td><td>${esc(r.dept||'—')}</td><td>${esc(r.user||'—')}</td><td class="num">${(r.items||[]).length}</td><td class="mut">${esc(r.purpose||'—')}</td><td class="mut" style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(r.detail)}">${esc(r.detail)}</td><td class="act">${r.status==='已撤回'?'<span class="mut">已撤回</span>':`<button class="btn sm" onclick="consumeRevoke('${r.id}')">撤回</button>`}</td></tr>`).join('');
 }
 function renderConsumeRows(){
   const tb=$('#cs-tbody');if(!tb)return;
   const k=(CS.q||'').trim().toLowerCase();
   const list=DB.assets.filter(a=>a.status==='idle').filter(a=>!k||[a.code,a.name,a.cat,a.location].some(v=>String(v||'').toLowerCase().includes(k)));
-  tb.innerHTML=list.length?list.map(a=>`<tr class="${CS.ids.includes(a.id)?'sel':''}"><td><input type="checkbox" data-csb="${esc(a.id)}" ${CS.ids.includes(a.id)?'checked':''} onchange="csToggle('${esc(a.id)}',this.checked,this)"></td><td><b>${esc(a.code)}</b></td><td>${esc(a.name)}</td><td>${esc(a.cat)}</td><td>${esc(a.unit||'台')}</td><td class="mut">${esc(a.location||'—')}</td><td class="num">${fmtMoney(a.amount)}</td></tr>`).join(''):'<tr><td colspan="7"><div class="empty">暂无闲置资产可出库</div></td></tr>';
+  tb.innerHTML=consumeRowsHtml(list)||'<tr><td colspan="7"><div class="empty">暂无闲置资产可出库</div></td></tr>';
   const t=$('#cs-total');if(t)t.textContent=list.length;
+  ['name','cat','inDept','location'].forEach(v=>{const el=$('#cs-g-'+v);if(el)el.checked=CS.group===v});
   updConsumeStat();
+}
+/* 单行（含勾选状态） */
+function csRowHtml(a){
+  return `<tr data-aid="${esc(a.id)}" class="${CS.ids.includes(a.id)?'sel':''}"><td><input type="checkbox" data-csb="${esc(a.id)}" ${CS.ids.includes(a.id)?'checked':''} onchange="csToggle('${esc(a.id)}',this.checked,this)"></td><td><b>${esc(a.code)}</b></td><td>${esc(a.name)}</td><td>${esc(a.cat)}</td><td>${esc(a.unit||'台')}</td><td class="mut">${esc(a.location||'—')}</td><td class="num">${fmtMoney(a.amount)}</td></tr>`;
+}
+/* 分组渲染：组头可整组勾选/取消（点勾选区外的组头文字切换展开收起） */
+function consumeRowsHtml(list){
+  if(!CS.group)return list.map(a=>csRowHtml(a)).join('');
+  const f=CS.group;
+  const keyOf=a=>f==='name'?(a.name||'—'):f==='cat'?(a.cat||'—'):f==='inDept'?(a.inDept||'—'):(a.location||'—');
+  const map=new Map();
+  list.forEach(a=>{const g=keyOf(a);if(!map.has(g))map.set(g,[]);map.get(g).push(a)});
+  const keys=[...map.keys()].sort((a,b)=>String(a).localeCompare(String(b),'zh'));
+  let html='',gi=0;
+  keys.forEach(g=>{
+    const items=map.get(g);
+    const col=!!CS.collapsed[gi];
+    const sum=items.reduce((s,a)=>s+(Number(a.amount)||0),0);
+    const selCnt=items.filter(a=>CS.ids.includes(a.id)).length;
+    const allSel=selCnt===items.length&&items.length>0;
+    html+=`<tr data-gi="${gi}" style="cursor:pointer;background:#f4f8fd"><td style="text-align:center"><input type="checkbox" data-csg="${gi}" ${allSel?'checked':''} onclick="event.stopPropagation();csGroupToggle(${gi},this.checked)"></td><td colspan="6" style="padding:8px 10px"><span style="display:inline-block;width:13px;color:#4a7ec7">${col?'▶':'▼'}</span> <b>${esc(g)}</b> <span class="mut">· ${items.length} 台 · ${fmtMoney(sum)}${selCnt?` · 已选 ${selCnt}`:''}</span></td></tr>`;
+    if(!col)html+=items.map(a=>csRowHtml(a)).join('');
+    gi++;
+  });
+  return html;
+}
+/* 组头勾选框：整组勾选/取消（不动展开状态） */
+function csGroupToggle(gi,on){
+  const list=csGroupItems(gi);
+  list.forEach(a=>{
+    const i=CS.ids.indexOf(a.id);
+    if(on&&i<0)CS.ids.push(a.id);
+    if(!on&&i>=0)CS.ids.splice(i,1);
+  });
+  renderConsumeRows();
+}
+/* 组头行点击：未全选→全选整组；已全选且展开→收起；已全选且收起→取消整组并展开 */
+function csGroupHead(gi){
+  const list=csGroupItems(gi);
+  if(!list.length)return;
+  const selCnt=list.filter(a=>CS.ids.includes(a.id)).length;
+  const allSel=selCnt===list.length;
+  if(!allSel){
+    list.forEach(a=>{if(!CS.ids.includes(a.id))CS.ids.push(a.id)});
+  }else if(CS.collapsed[gi]!==true){
+    CS.collapsed[gi]=true; /* 全选且展开 → 收起（保持勾选） */
+  }else{
+    CS.collapsed[gi]=false;
+    list.forEach(a=>{const i=CS.ids.indexOf(a.id);if(i>=0)CS.ids.splice(i,1)});
+  }
+  renderConsumeRows();
+}
+function csGroupItems(gi){
+  const k=(CS.q||'').trim().toLowerCase();
+  const list=DB.assets.filter(a=>a.status==='idle').filter(a=>!k||[a.code,a.name,a.cat,a.location].some(v=>String(v||'').toLowerCase().includes(k)));
+  if(!CS.group)return list;
+  const f=CS.group;
+  const keyOf=a=>f==='name'?(a.name||'—'):f==='cat'?(a.cat||'—'):f==='inDept'?(a.inDept||'—'):(a.location||'—');
+  const map=new Map();
+  list.forEach(a=>{const g=keyOf(a);if(!map.has(g))map.set(g,[]);map.get(g).push(a)});
+  const keys=[...map.keys()].sort((a,b)=>String(a).localeCompare(String(b),'zh'));
+  return map.get(keys[gi])||[];
+}
+function setConsumeGroup(v){CS.group=CS.group===v?'':v;CS.collapsed={};renderConsumeRows()}
+function toggleConsumeGroup(gi){CS.collapsed[gi]=!CS.collapsed[gi];renderConsumeRows()}
+/* ===== 撤回耗材出库：被撤回资产按原信息返回台账（闲置状态，编号不变） ===== */
+function consumeRevoke(rid){
+  if(!approveOnly())return;
+  const r=DB.records.find(x=>x.id===rid);
+  if(!r||r.type!=='耗材出库')return toast('未找到该出库单据','err');
+  if(r.status==='已撤回')return toast('该单据已撤回过，不能重复撤回','err');
+  const items=r.items||[];
+  const codes=items.map(i=>i.code).join('、');
+  confirmDlg(`确定撤回出库单 <b>${esc(r.no)}</b>？<br><span style="color:var(--gray)">${items.length} 台资产将按原信息<b style="color:var(--good)">返回台账（闲置状态，编号不变）</b>：<br>${esc(codes)}<br>撤回后单据标记「已撤回」，此操作不可恢复。</span>`,()=>{
+    /* 从快照重建资产：编号不变，恢复为闲置（无领用人） */
+    items.forEach(it=>{
+      DB.assets.push({id:it.assetId||genId(),code:it.code||'',name:it.name||'',cat:it.cat||'',spec:it.spec||'',productCode:it.productCode||'',qty:it.qty||1,unit:it.unit||'台',amount:Number(it.amount)||0,inDept:it.inDept||'',location:it.location||'',status:'idle',user:'',userDept:'',receiveDate:'',history:[{t:nowStr(),act:'耗材撤回',desc:`耗材出库撤回：由出库单 ${r.no} 返回台账（闲置）`,by:DB.role}]});
+    });
+    r.status='已撤回';
+    addRecord({no:nextDocNo('HCR'),type:'耗材撤回',date:todayStr(),by:DB.role,dept:r.dept||'',user:r.user||'',purpose:r.purpose||'',detail:`撤回出库单 ${r.no}：${items.length} 台资产返回台账（${codes}）`,status:'已完成'});
+    save();
+    toast(`已撤回：${items.length} 台资产已返回台账（原出库单 ${r.no} 标记为已撤回）`);
+    renderConsume();
+  },'撤回出库',true);
 }
 function csToggle(id,ck,el){
   const i=CS.ids.indexOf(id);
@@ -13589,7 +13685,7 @@ function doConsumeOut(){
   confirmDlg(`确定将 <b>${assets.length}</b> 台资产出库耗材（合计 ${fmtMoney(total)} 元）？<br><span style="color:var(--gray)">资产将<b style="color:#e5484d">从台账移除、不再追踪</b>（正常消耗，不重排编号）；出库记录保留，可在本页下方与 报表中心 → 耗材出库 查看导出。</span>`,()=>{
     const no=nextDocNo('HC');
     /* 明细快照：资产删除后记录仍完整可查（编号/名称/规格/SN/金额/部门等） */
-    const items=assets.map(a=>({code:a.code||'',name:a.name||'',cat:a.cat||'',spec:a.spec||'',productCode:a.productCode||'',qty:a.qty||1,unit:a.unit||'台',amount:Number(a.amount)||0,inDept:a.inDept||'',location:a.location||''}));
+    const items=assets.map(a=>({assetId:a.id,code:a.code||'',name:a.name||'',cat:a.cat||'',spec:a.spec||'',productCode:a.productCode||'',qty:a.qty||1,unit:a.unit||'台',amount:Number(a.amount)||0,inDept:a.inDept||'',location:a.location||''}));
     addRecord({no,type:'耗材出库',date:todayStr(),by:DB.role,dept,user,purpose,detail:`耗材出库 ${assets.length} 台（${assets.map(a=>a.code).join('、')}）`,status:'已完成',assetIds:assets.map(a=>a.id),items});
     /* 移出台账 + 清盘点引用；不重排编号（正常消耗：重排会使在库资产编号变化、已打印二维码失效） */
     const ids=new Set(assets.map(a=>a.id));
